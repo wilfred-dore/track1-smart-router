@@ -17,9 +17,11 @@ class LocalLLM:
         path = self.cfg["model_path"]
         try:
             from llama_cpp import Llama
-        except ImportError:
-            print("[local_llm] llama-cpp-python missing: local inference disabled",
-                  file=sys.stderr)
+        except Exception as e:
+            # Not just ImportError: a broken native lib raises RuntimeError/OSError.
+            # The container must degrade to full escalation, never crash.
+            print(f"[local_llm] llama-cpp-python unavailable ({e.__class__.__name__}: {e}): "
+                  "local inference disabled", file=sys.stderr)
             return
         if not os.path.exists(path):
             print(f"[local_llm] model not found ({path}): local inference disabled",

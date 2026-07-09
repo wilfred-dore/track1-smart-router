@@ -42,14 +42,18 @@ jobs:
 
       - name: Smoke test under grading limits (4 GB RAM, 2 vCPU, mock, 19 tasks)
         run: |
+          set -o pipefail
           mkdir -p io/input io/output
           python3 -c "import json,glob; tasks=[{'task_id':t['task_id'],'prompt':t['prompt']} for p in sorted(glob.glob('eval/tasks/*.json')) for t in json.load(open(p))]; json.dump(tasks, open('io/input/tasks.json','w'))"
           start=$(date +%s)
           docker run --rm --memory=4g --cpus=2 \
             -v "$PWD/io/input:/input:ro" -v "$PWD/io/output:/output" \
             -e FIREWORKS_MODE=mock \
-            "$IMAGE"
+            "$IMAGE" 2>&1 | tee run.log
           elapsed=$(( $(date +%s) - start ))
+          # The pipeline tolerates a broken local LLM at runtime (degrades to
+          # full escalation), but CI must catch it: require an actual model load.
+          grep -q "\[local_llm\] model loaded" run.log
           echo "19 tasks in ${elapsed}s (grading limit: 600s)"
           test "$elapsed" -lt 540  # fail with margin so we notice before the judges do
           python3 -c "
