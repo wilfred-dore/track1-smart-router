@@ -1,6 +1,16 @@
-# STATUS — 9 juillet 2026
+# STATUS — nuit du 9 au 10 juillet 2026
 
 ## Fait
+- **Chemin live validé sans Docker ni crédits** : Ollama local comme faux proxy Fireworks
+  (`FIREWORKS_MODE=live FIREWORKS_BASE_URL=http://localhost:11434/v1 FIREWORKS_API_KEY=ollama ALLOWED_MODELS=<modèle> make eval`).
+  Client OpenAI réel, usage réel, résolution ALLOWED_MODELS : tout fonctionne.
+- **Leçon modèles reasoning** (gemma4 via Ollama) : le raisonnement consomme le budget `max_tokens`
+  et le contenu final arrive vide/tronqué. Durci dans `src/fireworks.py` (`extract_text` : strip
+  `<think>`, repli sur le champ reasoning). Comparatif éval (19 tâches, 13 escalades) :
+  - mistral 7B (non-reasoning), budgets serrés : **16/19, 1 576 tokens** (échecs = erreurs de calcul d'un 7B)
+  - gemma4 (reasoning), budgets ×3 : **17/19, 3 526 tokens**
+  → au launch day, préférer un modèle non-thinking (kimi ?) ou budgéter large pour minimax-m3 ;
+  à calibrer avec les vrais modèles dès les crédits reçus (`escalation.model_preference` + `max_tokens`).
 - Formats I/O extraits du Participant Guide et implémentés (`/input/tasks.json` → `/output/results.json`).
 - Pipeline complet en MODE MOCK : solveurs → local → gate → escalade simulée avec comptage de tokens.
 - `config.yaml` : tout paramétrable (seuils, mapping catégorie→modèle, max_tokens, escalade, cache).

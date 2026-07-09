@@ -8,6 +8,7 @@ Le mode est choisi par la variable d'env FIREWORKS_MODE :
 """
 import math
 import os
+import re
 import sys
 
 from .config import by_category
@@ -15,6 +16,26 @@ from .config import by_category
 
 def approx_tokens(text):
     return max(1, math.ceil(len(text) / 4))
+
+
+_THINK_RE = re.compile(r"<think>.*?(?:</think>|$)", re.S)
+
+
+def extract_text(message):
+    """Réponse exploitable d'un message OpenAI-compatible, y compris pour les
+    modèles 'reasoning' (minimax-m3, gemma4...) : retire les blocs <think> inline
+    et, si le contenu final est vide (raisonnement coupé par max_tokens), récupère
+    la dernière ligne utile du champ reasoning plutôt que de ne rien répondre."""
+    content = _THINK_RE.sub("", (message.content or "")).strip()
+    if content:
+        return content
+    reasoning = (getattr(message, "reasoning", None)
+                 or getattr(message, "reasoning_content", None))
+    if reasoning:
+        lines = [l.strip() for l in str(reasoning).splitlines() if l.strip()]
+        if lines:
+            return lines[-1]
+    return ""
 
 
 class _UsageTracker:
@@ -63,7 +84,7 @@ class FireworksClient(_UsageTracker):
         resp = self._client.chat.completions.create(
             model=model, messages=messages, max_tokens=max_tokens,
             stop=stop or None, temperature=0)
-        text = (resp.choices[0].message.content or "").strip()
+        text = extract_text(resp.choices[0].message)
         if resp.usage:
             usage = self._record(resp.usage.prompt_tokens, resp.usage.completion_tokens)
         else:  # estimation de repli si le proxy ne renvoie pas l'usage
