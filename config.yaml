@@ -55,15 +55,18 @@ gate:
     code_debugging: 0.7
     code_generation: 0.7
   self_consistency:      # local resampling (0 Fireworks tokens, costs CPU time)
-    enabled: true
-    categories: [math, logic]
+    enabled: false       # n=2 proved flaky (agrees on wrong answers); moot while
+    categories: [math, logic]   # math/logic are in escalation.always below
     samples: 2           # total number of samples (2 = 1 resample)
     temperature: 0.7
 
 escalation:
   enabled: true          # escalate_enabled
   never: []              # categories never escalated
-  always: []             # categories escalated outright (bypass solvers + local), e.g. [code_generation]
+  # Calibration sweep 2026-07-10: the local 3B is unreliable on math/logic and the
+  # zero-cost gate cannot verify correctness there; escalating them outright gave
+  # 0 verified failures for ~900 estimated tokens (leader: 4,268) and 3x less CPU.
+  always: [math, logic]  # escalated outright (bypass local; solvers still run first)
   system_prompt: "Answer directly and concisely in English. No preamble, do not restate the question."
   category_instructions:
     math: "Give the final numeric answer with at most two short lines of working."

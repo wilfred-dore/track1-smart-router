@@ -1,5 +1,18 @@
 # STATUS — night of July 9-10, 2026
 
+## Calibration sweep (July 10) → final routing policy
+Three policies compared on the full eval (local 3B + mock escalation):
+- A baseline + multipart-factual gate: 14/19 verified, 18/19 optimistic, 553 tk, 56 s (a wrong local
+  math answer passed: n=2 self-consistency agreed on a wrong answer → flaky)
+- B no self-consistency: 16/19 verified, 19/19 optimistic, 418 tk, 41 s (gambles on local math)
+- C always-escalate math+logic: 13/19 verified with **0 verified failures**, 19/19 optimistic,
+  912 tk, **19 s**
+**Decision: C.** The accuracy gate is pass/fail and token headroom is huge (912 est. vs leader
+4,268); C also cuts local CPU 3x (timing risk). `escalation.always: [math, logic]`,
+self-consistency disabled. Solvers still catch trivial math at 0 tokens before escalation.
+Also hardened the gate: multi-part factual questions (e.g. practice-01) now escalate instead of
+letting the 3B hallucinate confidently.
+
 ## Latest results (full cascade, local Qwen2.5-3B active)
 - Local LLM + mock escalation: **16/19 verified, 18/19 optimistic, 2 escalations = 340 simulated tokens**.
 - Local LLM + Ollama/mistral as live stand-in Fireworks: **17/19 verified, 303 real tokens, 3 escalations**.

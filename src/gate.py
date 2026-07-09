@@ -54,6 +54,10 @@ def score(prompt, answer, category):
         s += 0.15 if any(n in a for n in names) else -0.3
     else:  # factual
         s += 0.1 if len(a.split()) >= 3 else -0.3
+        # Multi-part questions are where a small local model fails silently
+        # (wrong second half stated with full confidence): push toward escalation.
+        if " and " in prompt.lower() or prompt.count("?") > 1:
+            s -= 0.3
     return max(0.0, min(1.0, s))
 
 
