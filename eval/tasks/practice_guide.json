@@ -1,0 +1,59 @@
+[
+  {
+    "task_id": "practice-01",
+    "category": "factual",
+    "prompt": "What is the capital of Australia, and what body of water is it near?",
+    "check": {"all": [
+      {"type": "contains_any", "values": ["Canberra"]},
+      {"type": "contains_any", "values": ["Burley Griffin", "Molonglo", "lake"]}
+    ]}
+  },
+  {
+    "task_id": "practice-02",
+    "category": "math",
+    "prompt": "A store has 240 items. It sells 15% on Monday and 60 more on Tuesday. How many items remain?",
+    "check": {"type": "number", "value": 144}
+  },
+  {
+    "task_id": "practice-03",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment of this review: The battery life is great, but the screen scratches too easily.",
+    "check": {"type": "regex", "value": "\\bmixed\\b|positive.*negative|negative.*positive"}
+  },
+  {
+    "task_id": "practice-04",
+    "category": "summarization",
+    "prompt": "Summarize the following in exactly one sentence: A 2024 study of 3,000 employees found that hybrid work arrangements improved self-reported productivity by 12 percent and reduced attrition by nearly a third, yet had no measurable effect on promotion rates, and many managers continued to rate remote employees lower on leadership potential.",
+    "check": {"all": [
+      {"type": "max_sentences", "value": 1},
+      {"type": "contains_any", "values": ["hybrid", "remote"]}
+    ]}
+  },
+  {
+    "task_id": "practice-05",
+    "category": "ner",
+    "prompt": "Extract all named entities and their types from: Maria Sanchez joined Fireworks AI in Berlin last March.",
+    "check": {"type": "contains_all", "values": ["Maria Sanchez", "Fireworks", "Berlin", "March"]}
+  },
+  {
+    "task_id": "practice-06",
+    "category": "code_debugging",
+    "prompt": "This function should return the max of a list but has a bug: def get_max(nums): return nums[0]. Find and fix it.",
+    "check": {"type": "regex", "value": "max\\(|sorted\\(|for\\s+\\w+\\s+in"}
+  },
+  {
+    "task_id": "practice-07",
+    "category": "logic",
+    "prompt": "Three friends, Sam, Jo, and Lee, each own a different pet: cat, dog, bird. Sam does not own the bird. Jo owns the dog. Who owns the cat?",
+    "check": {"type": "regex", "value": "sam.{0,60}cat|cat.{0,60}sam"}
+  },
+  {
+    "task_id": "practice-08",
+    "category": "code_generation",
+    "prompt": "Write a Python function that returns the second-largest number in a list, handling duplicates correctly.",
+    "check": {"all": [
+      {"type": "contains_any", "values": ["def "]},
+      {"type": "contains_any", "values": ["sorted", "set(", "max", "for "]}
+    ]}
+  }
+]

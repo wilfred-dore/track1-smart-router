@@ -1,0 +1,98 @@
+# =====================================================================
+# Track 1 — Smart Router. TOUT est paramétrable ici, rien en dur.
+# Overrides par env : LOCAL_MODEL_PATH, INPUT_PATH, OUTPUT_PATH,
+#                     CONFIG_PATH, FIREWORKS_MODE (mock|live|auto)
+# =====================================================================
+
+io:
+  input_path: /input/tasks.json      # format du Participant Guide
+  output_path: /output/results.json
+
+cache:
+  enabled: true          # cache intra-run (prompts normalisés identiques). Jamais persisté entre runs.
+
+solvers:
+  enabled: true
+  use: [math, sentiment, ner, factual]   # retirer un nom pour désactiver ce solveur
+  min_confidence: 0.75   # en dessous, on ignore le solveur et on passe au LLM local
+
+local:
+  model_path: models/model.gguf     # override: LOCAL_MODEL_PATH (=/models/model.gguf dans l'image)
+  n_ctx: 2048
+  n_threads: 0                      # 0 = auto (os.cpu_count())
+  temperature: 0.1
+  system_prompt: "You are a precise assistant. Answer in English, directly and concisely. No preamble."
+  category_hints:
+    math: "Compute step by step briefly, then give the final numeric answer on the last line."
+    summarization: "Respect the requested length exactly (one sentence means exactly ONE sentence)."
+    sentiment: "Give the sentiment label (positive / negative / mixed / neutral) and one short justification."
+    ner: "List each entity with its type (person, organization, location, date)."
+    code_debugging: "State the bug in one line, then give the corrected code."
+    code_generation: "Return only the code with minimal comments."
+    logic: "State the final answer first, then one line of justification."
+    factual: "Answer in one or two sentences."
+  max_tokens:
+    default: 160
+    sentiment: 80
+    summarization: 100
+    ner: 140
+    factual: 140
+    math: 220
+    logic: 180
+    code_debugging: 300
+    code_generation: 300
+
+gate:
+  enabled: true
+  thresholds:            # confiance minimale pour GARDER la réponse locale (sinon escalade)
+    default: 0.6
+    sentiment: 0.45
+    summarization: 0.45
+    ner: 0.5
+    factual: 0.55
+    math: 0.8
+    logic: 0.8
+    code_debugging: 0.7
+    code_generation: 0.7
+  self_consistency:      # re-échantillonnage local (0 token Fireworks, coûte du temps CPU)
+    enabled: true
+    categories: [math, logic]
+    samples: 2           # nb total d'échantillons (2 = 1 re-échantillon)
+    temperature: 0.7
+
+escalation:
+  enabled: true          # escalate_enabled
+  never: []              # catégories jamais escaladées
+  always: []             # catégories escaladées d'office (bypass solveurs + local), ex: [code_generation]
+  system_prompt: "Answer directly and concisely in English. No preamble, do not restate the question."
+  category_instructions:
+    math: "Give the final numeric answer with at most two short lines of working."
+    sentiment: "Give the label and one short justification."
+    summarization: "Respect the requested length exactly."
+    ner: "List entities as 'text - type' only."
+    code_debugging: "State the bug in one line, then the corrected code only."
+    code_generation: "Return only the code."
+    logic: "Give the answer first, then one line of reasoning."
+    factual: "Two sentences maximum."
+  max_tokens:            # contrat de sortie serré par catégorie (tokens Fireworks)
+    default: 200
+    sentiment: 60
+    summarization: 100
+    ner: 150
+    factual: 120
+    math: 200
+    logic: 150
+    code_debugging: 350
+    code_generation: 350
+  max_prompt_chars: 6000 # tronque les prompts anormalement longs avant envoi
+  stop: []
+  model_preference:      # sous-chaînes matchées contre ALLOWED_MODELS (env) à l'exécution
+    default: [minimax]
+    code_debugging: [kimi, minimax]
+    code_generation: [kimi, minimax]
+
+mock:
+  completion_ratio: 0.6  # tokens de sortie simulés = ratio * max_tokens (estimation prudente)
+
+limits:
+  per_task_seconds: 25   # au-delà : simple avertissement dans les logs

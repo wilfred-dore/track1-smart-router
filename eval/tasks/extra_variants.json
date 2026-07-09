@@ -1,0 +1,77 @@
+[
+  {
+    "task_id": "extra-09",
+    "category": "factual",
+    "prompt": "What is the chemical symbol for gold, and what group of metals does it belong to?",
+    "check": {"all": [
+      {"type": "regex", "value": "\\bAu\\b", "case_sensitive": true},
+      {"type": "contains_any", "values": ["noble", "transition", "precious", "coinage", "group 11"]}
+    ]}
+  },
+  {
+    "task_id": "extra-10",
+    "category": "factual",
+    "prompt": "Explain in one or two sentences what the Domain Name System (DNS) does on the internet.",
+    "check": {"type": "contains_any", "values": ["domain", "address", "resolv", "translat"]}
+  },
+  {
+    "task_id": "extra-11",
+    "category": "math",
+    "prompt": "What is 15% of 240?",
+    "check": {"type": "number", "value": 36}
+  },
+  {
+    "task_id": "extra-12",
+    "category": "math",
+    "prompt": "A train travels 60 km in 45 minutes. What is its average speed in km/h?",
+    "check": {"type": "number", "value": 80}
+  },
+  {
+    "task_id": "extra-13",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment of this review: Absolutely love this keyboard, the keys feel amazing and the battery lasts for weeks.",
+    "check": {"type": "regex", "value": "\\bpositive\\b"}
+  },
+  {
+    "task_id": "extra-14",
+    "category": "summarization",
+    "prompt": "Summarize the following in one sentence: The city of Lyon launched a bike-share program in 2019 with 500 bicycles; ridership tripled within two years, prompting the city to add 1,200 more bikes and extend the service to three neighbouring suburbs, although vandalism and maintenance costs remain a persistent challenge.",
+    "check": {"all": [
+      {"type": "max_sentences", "value": 1},
+      {"type": "contains_any", "values": ["bike", "Lyon", "cycl"]}
+    ]}
+  },
+  {
+    "task_id": "extra-15",
+    "category": "ner",
+    "prompt": "Extract all named entities and their types from: On 12 May, Dr. Amina Diallo presented OpenAI's annual report at the Sorbonne in Paris.",
+    "check": {"type": "contains_all", "values": ["Amina Diallo", "OpenAI", "Paris"]}
+  },
+  {
+    "task_id": "extra-16",
+    "category": "code_debugging",
+    "prompt": "This function should sum the even numbers in a list but has a bug: def sum_even(nums): return sum(n for n in nums if n % 2 == 1). Find and fix it.",
+    "check": {"type": "regex", "value": "%\\s*2\\s*==\\s*0"}
+  },
+  {
+    "task_id": "extra-17",
+    "category": "logic",
+    "prompt": "Anna, Ben, and Chloe finished a race in different positions. Ben finished ahead of Anna, and Chloe did not finish first. Who won the race?",
+    "check": {"type": "regex", "value": "\\bben\\b"}
+  },
+  {
+    "task_id": "extra-18",
+    "category": "code_generation",
+    "prompt": "Write a Python function that checks whether a string is a palindrome, ignoring case and spaces.",
+    "check": {"all": [
+      {"type": "contains_any", "values": ["def "]},
+      {"type": "contains_any", "values": ["[::-1]", "reversed", "while"]}
+    ]}
+  },
+  {
+    "task_id": "extra-19",
+    "category": "sentiment",
+    "prompt": "Classify the sentiment of this review: The app crashes every time I open it and customer support never replied to my emails.",
+    "check": {"type": "regex", "value": "\\bnegative\\b"}
+  }
+]

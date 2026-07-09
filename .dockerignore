@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.pyc
+.env
+.env.example
+models
+local_io
+eval
+*.pdf
+*.md
+Makefile
+.gitignore
+.dockerignore
