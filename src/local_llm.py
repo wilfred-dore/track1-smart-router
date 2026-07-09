@@ -1,7 +1,7 @@
-"""Wrapper llama-cpp-python (GGUF 2-3B quantisé 4-bit, CPU-only).
+"""llama-cpp-python wrapper (GGUF 2-3B 4-bit quantized, CPU-only).
 
-Se dégrade proprement : si llama-cpp-python ou le fichier modèle est absent,
-generate() retourne None et le routeur passe à l'étape suivante (escalade).
+Degrades gracefully: if llama-cpp-python or the model file is missing,
+generate() returns None and the router moves on to the next stage (escalation).
 """
 import os
 import sys
@@ -18,11 +18,11 @@ class LocalLLM:
         try:
             from llama_cpp import Llama
         except ImportError:
-            print("[local_llm] llama-cpp-python absent : inférence locale désactivée",
+            print("[local_llm] llama-cpp-python missing: local inference disabled",
                   file=sys.stderr)
             return
         if not os.path.exists(path):
-            print(f"[local_llm] modèle introuvable ({path}) : inférence locale désactivée",
+            print(f"[local_llm] model not found ({path}): local inference disabled",
                   file=sys.stderr)
             return
         n_threads = self.cfg.get("n_threads") or os.cpu_count() or 2
@@ -30,9 +30,9 @@ class LocalLLM:
             self._llm = Llama(model_path=path, n_ctx=self.cfg["n_ctx"],
                               n_threads=n_threads, verbose=False)
             self.available = True
-            print(f"[local_llm] modèle chargé : {path} ({n_threads} threads)", file=sys.stderr)
+            print(f"[local_llm] model loaded: {path} ({n_threads} threads)", file=sys.stderr)
         except Exception as e:
-            print(f"[local_llm] échec chargement modèle : {e}", file=sys.stderr)
+            print(f"[local_llm] model load failed: {e}", file=sys.stderr)
 
     def generate(self, prompt, category, temperature=None):
         if not self.available:
@@ -49,5 +49,5 @@ class LocalLLM:
             text = (out["choices"][0]["message"]["content"] or "").strip()
             return text or None
         except Exception as e:
-            print(f"[local_llm] échec génération : {e}", file=sys.stderr)
+            print(f"[local_llm] generation failed: {e}", file=sys.stderr)
             return None

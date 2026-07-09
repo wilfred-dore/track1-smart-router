@@ -1,10 +1,10 @@
-"""Point d'entrée : lit /input/tasks.json, écrit /output/results.json.
+"""Entry point: reads /input/tasks.json, writes /output/results.json.
 
-Formats exacts du Participant Guide :
-  entrée : [ { "task_id": "...", "prompt": "..." }, ... ]
-  sortie : [ { "task_id": "...", "answer": "..." }, ... ]
-Exit code 0 en succès, non nul en échec. Une réponse est toujours écrite pour
-chaque task_id, même si une tâche individuelle échoue.
+Exact formats from the Participant Guide:
+  input  : [ { "task_id": "...", "prompt": "..." }, ... ]
+  output : [ { "task_id": "...", "answer": "..." }, ... ]
+Exit code 0 on success, non-zero on failure. An answer is always written for
+every task_id, even if an individual task fails.
 """
 import json
 import os
@@ -28,7 +28,7 @@ def main():
         with open(input_path, encoding="utf-8") as f:
             tasks = json.load(f)
     except Exception as e:
-        print(f"[main] lecture de {input_path} impossible : {e}", file=sys.stderr)
+        print(f"[main] cannot read {input_path}: {e}", file=sys.stderr)
         return 1
 
     router = Router(cfg, LocalLLM(cfg), get_client(cfg))
@@ -37,7 +37,7 @@ def main():
         try:
             rec = router.solve(task)
         except Exception as e:
-            print(f"[main] échec tâche {task.get('task_id')} : {e}", file=sys.stderr)
+            print(f"[main] task {task.get('task_id')} failed: {e}", file=sys.stderr)
             rec = {"task_id": task.get("task_id"), "answer": "Unable to answer.",
                    "route": "error", "tokens": 0}
         results.append({"task_id": rec["task_id"], "answer": rec["answer"]})
@@ -51,8 +51,8 @@ def main():
     os.replace(tmp_path, output_path)
 
     usage = router.fw.usage_summary()
-    print(f"[main] {len(results)} réponses écrites dans {output_path} "
-          f"en {time.time() - t0:.1f}s — Fireworks : {usage['calls']} appels, "
+    print(f"[main] {len(results)} answers written to {output_path} "
+          f"in {time.time() - t0:.1f}s — Fireworks: {usage['calls']} calls, "
           f"{usage['total_tokens']} tokens{' (MOCK)' if router.fw.is_mock else ''}",
           file=sys.stderr)
     return 0

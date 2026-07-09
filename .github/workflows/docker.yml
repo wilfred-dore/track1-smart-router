@@ -1,0 +1,68 @@
+# Build the linux/amd64 image on a native amd64 runner, smoke-test it under the
+# grading limits (4 GB RAM / 2 vCPU), check the compressed size, and only then
+# push to GHCR. After the first push, set the GHCR package visibility to PUBLIC
+# (GitHub packages are private by default) or the judges cannot pull it.
+name: docker
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image name (GHCR requires lowercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/track1-smart-router:latest" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (linux/amd64, weights bundled at build time)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          tags: ${{ env.IMAGE }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test under grading limits (4 GB RAM, 2 vCPU, mock, 19 tasks)
+        run: |
+          mkdir -p io/input io/output
+          python3 -c "import json,glob; tasks=[{'task_id':t['task_id'],'prompt':t['prompt']} for p in sorted(glob.glob('eval/tasks/*.json')) for t in json.load(open(p))]; json.dump(tasks, open('io/input/tasks.json','w'))"
+          start=$(date +%s)
+          docker run --rm --memory=4g --cpus=2 \
+            -v "$PWD/io/input:/input:ro" -v "$PWD/io/output:/output" \
+            -e FIREWORKS_MODE=mock \
+            "$IMAGE"
+          elapsed=$(( $(date +%s) - start ))
+          echo "19 tasks in ${elapsed}s (grading limit: 600s)"
+          test "$elapsed" -lt 540  # fail with margin so we notice before the judges do
+          python3 -c "
+          import json
+          r = json.load(open('io/output/results.json'))
+          assert len(r) == 19, f'expected 19 results, got {len(r)}'
+          assert all(isinstance(e, dict) and set(e) == {'task_id', 'answer'} and e['answer'] for e in r)
+          print('results.json: schema OK')"
+
+      - name: Compressed size check (< 10 GB)
+        run: |
+          bytes=$(docker save "$IMAGE" | gzip | wc -c)
+          awk -v b="$bytes" 'BEGIN {printf "compressed: %.2f GB\n", b/1e9; exit (b > 10e9)}'
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push
+        run: docker push "$IMAGE"

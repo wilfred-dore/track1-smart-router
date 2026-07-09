@@ -1,9 +1,9 @@
-"""Solveurs déterministes : répondent à coût nul quand le motif est trivial.
+"""Deterministic solvers: answer at zero cost when the pattern is trivial.
 
-Chaque solveur retourne (answer, confidence) ou None s'il ne sait pas.
-Aucune réponse spécifique à une tâche n'est codée en dur : uniquement des règles
-générales (arithmétique, lexiques de sentiment, gazetteers de culture générale)
-qui généralisent aux variantes inédites.
+Each solver returns (answer, confidence) or None when it does not know.
+No task-specific answers are hardcoded: only general rules (arithmetic,
+sentiment lexicons, general-knowledge gazetteers) that generalize to
+unseen variants.
 """
 import ast
 import operator
@@ -31,7 +31,7 @@ def _safe_eval(expr):
             return _OPS[type(node.op)](ev(node.left), ev(node.right))
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
             return -ev(node.operand)
-        raise ValueError("expression non autorisée")
+        raise ValueError("disallowed expression")
 
     return ev(ast.parse(expr, mode="eval"))
 
@@ -74,7 +74,7 @@ _NEGATIONS = {"not", "no", "never", "hardly", "barely", "isn't", "wasn't", "does
 
 
 def _sentiment_hits(text):
-    """Retourne (mots positifs, mots négatifs) trouvés, en tenant compte des négations."""
+    """Return (positive words, negative words) found, accounting for negations."""
     words = re.findall(r"[a-z']+", text.lower())
     pos, neg = set(), set()
     for i, w in enumerate(words):
@@ -177,7 +177,7 @@ def solve_ner(prompt):
         elif titled or len(tokens) >= 2:
             kind = "person"
         else:
-            continue  # token isolé inconnu : trop incertain
+            continue  # unknown isolated token: too uncertain
         entities.append((m.start(), span, kind))
 
     entities = sorted(set(entities))
@@ -211,7 +211,7 @@ _CAPITALS = {
 def solve_factual(prompt):
     text = prompt.strip().lower().rstrip("?").strip()
     if " and " in text or prompt.count("?") > 1:
-        return None  # question multi-parties : pas trivial
+        return None  # multi-part question: not trivial
     m = re.fullmatch(r"(?:what is|what's|name)\s+the\s+capital(?:\s+city)?\s+of\s+([a-z .'-]+)", text)
     if m:
         country = m.group(1).strip().rstrip(".")
@@ -221,7 +221,7 @@ def solve_factual(prompt):
     return None
 
 
-# ------------------------------------------------------------------- entrée
+# -------------------------------------------------------------- entry point
 
 _SOLVERS = {
     "math": solve_math,

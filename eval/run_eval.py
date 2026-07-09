@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Évalue le pipeline sur les 19 fixtures locales (mode mock par défaut).
+"""Evaluate the pipeline on the 19 local fixtures (mock mode by default).
 
-Deux lectures de l'accuracy :
-  - vérifiée  : la réponse passe le checker local (regex/nombre/contenu)
-  - optimiste : les tâches escaladées en mode mock sont supposées correctes
-                (un modèle Fireworks de la liste les réussirait) — comptées à part.
-Lancer en live : FIREWORKS_MODE=live python3 eval/run_eval.py (nécessite .env).
+Two accuracy readings:
+  - verified  : the answer passes the local checker (regex/number/content)
+  - optimistic: tasks escalated in mock mode are assumed correct (an allowed
+                Fireworks model would get them right) — counted separately.
+Live run: FIREWORKS_MODE=live python3 eval/run_eval.py (requires .env).
 """
 import glob
 import json
@@ -22,7 +22,7 @@ from src.fireworks import get_client  # noqa: E402
 from src.local_llm import LocalLLM  # noqa: E402
 from src.router import Router  # noqa: E402
 
-GATE_THRESHOLD = 0.80  # gate d'accuracy du leaderboard
+GATE_THRESHOLD = 0.80  # leaderboard accuracy gate
 
 
 def _numbers(text):
@@ -51,7 +51,7 @@ def check(answer, spec):
         return re.search(spec["value"], answer, flags) is not None
     if kind == "max_sentences":
         return len(_sentences(answer)) <= spec["value"]
-    raise ValueError(f"check inconnu : {spec}")
+    raise ValueError(f"unknown check: {spec}")
 
 
 def main():
@@ -76,7 +76,7 @@ def main():
     for r in rows:
         by_cat[r["expected_cat"]].append(r)
 
-    print(f"\n{'catégorie':<16} {'n':>2} {'solver':>6} {'local':>5} {'fw':>3} "
+    print(f"\n{'category':<16} {'n':>2} {'solver':>6} {'local':>5} {'fw':>3} "
           f"{'ok':>3} {'ok?':>3} {'ko':>3} {'tokens':>7}")
     print("-" * 56)
     for cat in sorted(by_cat):
@@ -93,13 +93,13 @@ def main():
 
     misrouted = [r for r in rows if r["category"] != r["expected_cat"]]
     if misrouted:
-        print("\nMal classées par le routeur :")
+        print("\nMisclassified by the router:")
         for r in misrouted:
-            print(f"  {r['task_id']}: attendu={r['expected_cat']} obtenu={r['category']}")
+            print(f"  {r['task_id']}: expected={r['expected_cat']} got={r['category']}")
 
     failed = [r for r in rows if r["ok"] is False]
     if failed:
-        print("\nÉchecs vérifiés :")
+        print("\nVerified failures:")
         for r in failed:
             print(f"  {r['task_id']} [{r['route']}]: {r['answer'][:120]!r}")
 
@@ -107,15 +107,15 @@ def main():
     assumed = sum(1 for r in rows if r["ok"] is None)
     total = len(rows)
     usage = router.fw.usage_summary()
-    mock = " simulés (MOCK)" if router.fw.is_mock else ""
+    mock = " simulated (MOCK)" if router.fw.is_mock else ""
 
-    print(f"\nAccuracy vérifiée localement : {verified}/{total}")
-    print(f"Accuracy optimiste (escalades supposées justes) : {verified + assumed}/{total} "
-          f"— gate leaderboard : {GATE_THRESHOLD:.0%} soit {int(total * GATE_THRESHOLD) + 1}/{total}")
-    print(f"Tokens Fireworks{mock} : {usage['total_tokens']} "
+    print(f"\nLocally verified accuracy: {verified}/{total}")
+    print(f"Optimistic accuracy (escalations assumed correct): {verified + assumed}/{total} "
+          f"— leaderboard gate: {GATE_THRESHOLD:.0%} i.e. {int(total * GATE_THRESHOLD) + 1}/{total}")
+    print(f"Fireworks tokens{mock}: {usage['total_tokens']} "
           f"(prompt {usage['prompt_tokens']} / completion {usage['completion_tokens']}) "
-          f"sur {usage['calls']} appels")
-    print("Rappel leader actuel : 4 268 tokens à 84,2 %\n")
+          f"over {usage['calls']} calls")
+    print("Current leader reminder: 4,268 tokens at 84.2%\n")
     return 0
 
 

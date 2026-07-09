@@ -1,10 +1,11 @@
-"""Client Fireworks (API OpenAI-compatible) + mock qui compte les tokens.
+"""Fireworks client (OpenAI-compatible API) + token-counting mock.
 
-Le mode est choisi par la variable d'env FIREWORKS_MODE :
-  - mock : aucune requête réseau, réponses simulées, tokens comptés (estimation)
-  - live : appels réels via FIREWORKS_BASE_URL / FIREWORKS_API_KEY
-  - auto (défaut) : live si FIREWORKS_API_KEY est présent, sinon mock
-    -> à l'évaluation le harness injecte la clé, donc auto => live sans changement de code.
+The mode is selected by the FIREWORKS_MODE env var:
+  - mock : no network calls, simulated answers, tokens counted (estimate)
+  - live : real calls through FIREWORKS_BASE_URL / FIREWORKS_API_KEY
+  - auto (default) : live if FIREWORKS_API_KEY is present, otherwise mock
+    -> at evaluation time the harness injects the key, so auto => live
+       with no code change.
 """
 import math
 import os
@@ -22,10 +23,10 @@ _THINK_RE = re.compile(r"<think>.*?(?:</think>|$)", re.S)
 
 
 def extract_text(message):
-    """Réponse exploitable d'un message OpenAI-compatible, y compris pour les
-    modèles 'reasoning' (minimax-m3, gemma4...) : retire les blocs <think> inline
-    et, si le contenu final est vide (raisonnement coupé par max_tokens), récupère
-    la dernière ligne utile du champ reasoning plutôt que de ne rien répondre."""
+    """Usable answer from an OpenAI-compatible message, including reasoning
+    models (minimax-m3, gemma4...): strips inline <think> blocks and, when the
+    final content is empty (reasoning cut off by max_tokens), falls back to the
+    last useful line of the reasoning field rather than answering nothing."""
     content = _THINK_RE.sub("", (message.content or "")).strip()
     if content:
         return content
@@ -76,7 +77,7 @@ class FireworksClient(_UsageTracker):
 
     def __init__(self):
         super().__init__()
-        from openai import OpenAI  # import paresseux : inutile en mode mock
+        from openai import OpenAI  # lazy import: not needed in mock mode
         self._client = OpenAI(base_url=os.environ["FIREWORKS_BASE_URL"],
                               api_key=os.environ["FIREWORKS_API_KEY"])
 
@@ -87,7 +88,7 @@ class FireworksClient(_UsageTracker):
         text = extract_text(resp.choices[0].message)
         if resp.usage:
             usage = self._record(resp.usage.prompt_tokens, resp.usage.completion_tokens)
-        else:  # estimation de repli si le proxy ne renvoie pas l'usage
+        else:  # fallback estimate if the proxy does not return usage
             usage = self._record(sum(approx_tokens(m["content"]) for m in messages),
                                  approx_tokens(text))
         return text, usage
@@ -99,13 +100,13 @@ def get_client(cfg):
         mode = "live" if os.environ.get("FIREWORKS_API_KEY") else "mock"
     if mode == "live":
         return FireworksClient()
-    print("[fireworks] MODE MOCK : aucun appel réseau, tokens simulés", file=sys.stderr)
+    print("[fireworks] MOCK MODE: no network calls, simulated tokens", file=sys.stderr)
     return MockFireworksClient(cfg["mock"]["completion_ratio"])
 
 
 def resolve_model(category, cfg):
-    """Choisit un modèle dans ALLOWED_MODELS (env, jamais en dur) selon les
-    préférences par catégorie de config.yaml (matching par sous-chaîne)."""
+    """Pick a model from ALLOWED_MODELS (env, never hardcoded) using the
+    per-category preferences from config.yaml (substring matching)."""
     allowed = [m.strip() for m in os.environ.get("ALLOWED_MODELS", "").split(",") if m.strip()]
     prefs = by_category(cfg["escalation"]["model_preference"], category) or []
     for pref in prefs:
@@ -114,4 +115,4 @@ def resolve_model(category, cfg):
                 return model
     if allowed:
         return allowed[0]
-    return "mock-model"  # uniquement atteignable en mode mock
+    return "mock-model"  # only reachable in mock mode

@@ -1,13 +1,13 @@
-"""Chargement de config.yaml + overrides par variables d'environnement."""
+"""Load config.yaml + environment variable overrides."""
 import os
 
 import yaml
 
 
 def load_dotenv():
-    """Charge .env s'il existe (dev local uniquement ; jamais présent dans l'image).
+    """Load .env if present (local development only; never shipped in the image).
 
-    Ne remplace jamais une variable déjà présente dans l'environnement.
+    Never overrides a variable already set in the environment.
     """
     if not os.path.exists(".env"):
         return
@@ -38,7 +38,7 @@ def load_config(path=None):
 
 
 def by_category(mapping, category):
-    """Valeur par catégorie avec repli sur 'default' (max_tokens, thresholds, ...)."""
+    """Per-category value with fallback to 'default' (max_tokens, thresholds, ...)."""
     if not isinstance(mapping, dict):
         return mapping
     return mapping.get(category, mapping.get("default"))

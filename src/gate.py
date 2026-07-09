@@ -1,7 +1,8 @@
-"""Gate de confiance à coût nul : heuristiques déterministes + self-consistency locale.
+"""Zero-cost confidence gate: deterministic heuristics + local self-consistency.
 
-score() retourne une confiance dans [0, 1] ; le routeur la compare au seuil
-par catégorie de config.yaml pour décider de garder la réponse locale ou d'escalader.
+score() returns a confidence in [0, 1]; the router compares it against the
+per-category threshold from config.yaml to decide whether to keep the local
+answer or escalate.
 """
 import re
 
@@ -46,7 +47,7 @@ def score(prompt, answer, category):
     elif category == "summarization":
         if "one sentence" in prompt.lower() and len(_sentences(a)) > 1:
             s -= 0.3
-        if len(a) >= len(prompt):  # résumé plus long que la source : suspect
+        if len(a) >= len(prompt):  # a summary longer than its source is suspect
             s -= 0.3
     elif category == "logic":
         names = set(re.findall(r"\b[A-Z][a-z]+\b", prompt)) - _STOP_NAMES
@@ -57,7 +58,7 @@ def score(prompt, answer, category):
 
 
 def answer_key(answer, category):
-    """Clé de comparaison pour la self-consistency (la 'substance' de la réponse)."""
+    """Comparison key for self-consistency (the 'substance' of the answer)."""
     low = answer.lower()
     if category == "math":
         nums = re.findall(r"-?\d[\d,]*\.?\d*", low)
@@ -69,9 +70,9 @@ def answer_key(answer, category):
 
 
 def self_consistency_bonus(answer, category, resample, samples=2):
-    """Re-échantillonne localement (0 token Fireworks) et compare les clés.
+    """Resample locally (0 Fireworks tokens) and compare answer keys.
 
-    Accord de tous les échantillons -> +0.2 ; désaccord -> -0.25 ; échec -> 0.
+    All samples agree -> +0.2 ; disagreement -> -0.25 ; failure -> 0.
     """
     key = answer_key(answer, category)
     for _ in range(max(1, samples - 1)):

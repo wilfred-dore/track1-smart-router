@@ -1,32 +1,57 @@
-# STATUS — nuit du 9 au 10 juillet 2026
+# STATUS — night of July 9-10, 2026
 
-## Fait
-- **Chemin live validé sans Docker ni crédits** : Ollama local comme faux proxy Fireworks
-  (`FIREWORKS_MODE=live FIREWORKS_BASE_URL=http://localhost:11434/v1 FIREWORKS_API_KEY=ollama ALLOWED_MODELS=<modèle> make eval`).
-  Client OpenAI réel, usage réel, résolution ALLOWED_MODELS : tout fonctionne.
-- **Leçon modèles reasoning** (gemma4 via Ollama) : le raisonnement consomme le budget `max_tokens`
-  et le contenu final arrive vide/tronqué. Durci dans `src/fireworks.py` (`extract_text` : strip
-  `<think>`, repli sur le champ reasoning). Comparatif éval (19 tâches, 13 escalades) :
-  - mistral 7B (non-reasoning), budgets serrés : **16/19, 1 576 tokens** (échecs = erreurs de calcul d'un 7B)
-  - gemma4 (reasoning), budgets ×3 : **17/19, 3 526 tokens**
-  → au launch day, préférer un modèle non-thinking (kimi ?) ou budgéter large pour minimax-m3 ;
-  à calibrer avec les vrais modèles dès les crédits reçus (`escalation.model_preference` + `max_tokens`).
-- Formats I/O extraits du Participant Guide et implémentés (`/input/tasks.json` → `/output/results.json`).
-- Pipeline complet en MODE MOCK : solveurs → local → gate → escalade simulée avec comptage de tokens.
-- `config.yaml` : tout paramétrable (seuils, mapping catégorie→modèle, max_tokens, escalade, cache).
-- 19 fixtures d'éval : 8 practice tasks du guide (practice-04 complétée avec un paragraphe maison) + 11 variantes couvrant les 8 catégories.
-- `eval/run_eval.py` : accuracy vérifiée + optimiste, tokens simulés, tableau par catégorie.
-- Dockerfile CPU-only linux/amd64, GGUF (Qwen2.5-3B-Instruct Q4_K_M) téléchargé au build.
-- Makefile : setup / eval / build / run / size. Git initialisé.
+## Latest results (full cascade, local Qwen2.5-3B active)
+- Local LLM + mock escalation: **16/19 verified, 18/19 optimistic, 2 escalations = 340 simulated tokens**.
+- Local LLM + Ollama/mistral as live stand-in Fireworks: **17/19 verified, 303 real tokens, 3 escalations**.
+  Remaining failures understood: practice-01 (local 3B factual hallucination passing the gate,
+  calibration knob: `gate.thresholds.factual`) and practice-02 (7B stand-in arithmetic error —
+  real minimax/kimi would not make it; self-consistency correctly forced the escalation).
+- Robustness: missing input / malformed JSON → exit 1; empty list / empty, huge or non-English
+  prompts → exit 0 with valid schema. 4/4 PASS.
+- ⚠️ Timing: ~528 CPU-seconds for 19 tasks on this M-series Mac. On 2 grading vCPUs this could
+  approach the 10-minute limit → the GitHub Actions smoke test measures it on x86 with
+  --cpus=2 and fails above 540 s. Mitigations if needed: lower `local.max_tokens`,
+  `gate.self_consistency.enabled: false`, or `escalation.always` for slow categories.
+- CI: `.github/workflows/docker.yml` builds linux/amd64 natively, smoke-tests under grading
+  limits, checks compressed size, then pushes to GHCR (set the package to PUBLIC after first push).
 
-## Reste à faire (par priorité)
-1. `make setup-llm && make model` puis `make eval` : mesurer l'accuracy réelle du LLM local et le temps par tâche (budget 10 min pour 19 tâches sur 2 vCPU — si trop lent, réduire `local.max_tokens` ou passer `gate.self_consistency.enabled: false`).
-2. `make build && make run && make size` : valider le conteneur de bout en bout (⚠️ Docker indisponible sur cette machine au 9/07 au soir — démarrer Docker Desktop d'abord ; build llama-cpp via roues CPU précompilées, si l'index est indisponible voir le commentaire dans le Dockerfile).
-3. Quand les crédits Fireworks arrivent : `.env` + `FIREWORKS_MODE=live`, éval sur 2-3 tâches d'abord (soumissions rate-limited).
-4. Calibrer les seuils du gate sur l'éval locale : viser 17/19, escalader math/logic/debug si le local est faible (`escalation.always`).
-5. Pousser l'image en public (linux/amd64) et soumettre. Deadline : 11 juillet 18h CET.
+## Done
+- **Live path validated without Docker or credits**: local Ollama as a stand-in Fireworks proxy
+  (`FIREWORKS_MODE=live FIREWORKS_BASE_URL=http://localhost:11434/v1 FIREWORKS_API_KEY=ollama ALLOWED_MODELS=<model> make eval`).
+  Real OpenAI client, real usage, ALLOWED_MODELS resolution: everything works.
+- **Reasoning-model lesson** (gemma4 via Ollama): reasoning eats the `max_tokens` budget
+  and the final content comes back empty/truncated. Hardened in `src/fireworks.py`
+  (`extract_text`: strips `<think>`, falls back to the reasoning field). Eval comparison
+  (19 tasks, 13 escalations):
+  - mistral 7B (non-reasoning), tight budgets: **16/19, 1,576 tokens** (failures = 7B arithmetic mistakes)
+  - gemma4 (reasoning), budgets ×3: **17/19, 3,526 tokens**
+  → on launch day, prefer a non-thinking model (kimi?) or budget generously for minimax-m3;
+  calibrate with the real models as soon as credits arrive (`escalation.model_preference` + `max_tokens`).
+- I/O formats extracted from the Participant Guide and implemented (`/input/tasks.json` → `/output/results.json`).
+- Full pipeline in MOCK MODE: solvers → local → gate → simulated escalation with token counting.
+- `config.yaml`: everything configurable (thresholds, category→model mapping, max_tokens, escalation, cache).
+- 19 eval fixtures: 8 guide practice tasks (practice-04 completed with our own paragraph) + 11 variants covering all 8 categories.
+- `eval/run_eval.py`: verified + optimistic accuracy, simulated tokens, per-category table.
+- CPU-only linux/amd64 Dockerfile, GGUF (Qwen2.5-3B-Instruct Q4_K_M) downloaded at build time.
+- Makefile: setup / eval / build / run / size. Git initialized.
+- llama-cpp-python installed locally (Python 3.12 venv) + GGUF downloaded: real local-LLM path testable on this machine.
 
-## Points d'attention
-- `ZERO_API_CALLS` n'est qu'un flag, mais CLAUDE.md recommande de garder quelques escalades réelles.
-- Le gate math/logic est superficiel (présence d'un nombre, d'un nom) : la self-consistency locale (activée pour math/logic) est la vraie défense. À chronométrer dans le conteneur.
-- practice-04 du guide contient « [your own sample paragraph here] » : remplacée par un paragraphe maison dans les fixtures.
+## Remaining (by priority)
+1. `make eval` with the local LLM active: measure real local accuracy and per-task time
+   (10-minute budget for 19 tasks on 2 vCPU — if too slow, lower `local.max_tokens` or set
+   `gate.self_consistency.enabled: false`).
+2. `make build && make run && make size`: validate the container end to end (⚠️ Docker unavailable
+   on this machine as of July 9 evening — start Docker Desktop first; llama-cpp installed from
+   precompiled CPU wheels, see the Dockerfile comment if the index is down). Alternative: GitHub Actions.
+3. When Fireworks credits arrive: `.env` + `FIREWORKS_MODE=live`, evaluate on 2-3 tasks first
+   (submissions are rate-limited).
+4. Calibrate gate thresholds on the local eval: aim for 17/19, escalate math/logic/debug if the
+   local model is weak (`escalation.always`).
+5. Push the image publicly (linux/amd64) and submit. Deadline: July 11, 6pm CET.
+
+## Watch items
+- `ZERO_API_CALLS` is only a flag, but CLAUDE.md recommends keeping a few real escalations.
+- The math/logic gate is shallow (presence of a number/name): local self-consistency (enabled for
+  math/logic) is the real defense. Time it inside the container.
+- practice-04 in the guide contains "[your own sample paragraph here]": replaced with our own
+  paragraph in the fixtures.

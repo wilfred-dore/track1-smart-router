@@ -1,7 +1,7 @@
-"""Cascade : solveurs déterministes -> LLM local -> gate -> escalade Fireworks.
+"""Cascade: deterministic solvers -> local LLM -> gate -> Fireworks escalation.
 
-Un seul passage par tâche, jamais de boucle : chaque appel Fireworks
-supplémentaire coûte des tokens, donc du classement.
+A single pass per task, never a loop: every extra Fireworks call costs
+tokens, hence leaderboard rank.
 """
 import re
 import sys
@@ -69,11 +69,11 @@ class Router:
 
         elapsed = time.time() - t0
         if elapsed > self.cfg["limits"]["per_task_seconds"]:
-            print(f"[router] tâche lente ({elapsed:.1f}s) : {rec['task_id']}", file=sys.stderr)
+            print(f"[router] slow task ({elapsed:.1f}s): {rec['task_id']}", file=sys.stderr)
         return rec
 
     def _solve_uncached(self, prompt, category, rec):
-        # [1] solveurs déterministes -> 0 token
+        # [1] deterministic solvers -> 0 tokens
         scfg = self.cfg["solvers"]
         if scfg["enabled"] and category in scfg["use"]:
             result = solvers.solve(prompt, category)
@@ -81,7 +81,7 @@ class Router:
                 rec["route"] = "solver"
                 return result[0]
 
-        # [2] LLM local + [3] gate de confiance -> 0 token
+        # [2] local LLM + [3] confidence gate -> 0 tokens
         ecfg = self.cfg["escalation"]
         local_answer = None
         if category not in (ecfg["always"] or []):
@@ -102,12 +102,12 @@ class Router:
                     rec["route"] = "local"
                     return local_answer
 
-        # [4] escalade Fireworks — seulement si nécessaire
+        # [4] Fireworks escalation — only when necessary
         if ecfg["enabled"] and category not in (ecfg["never"] or []):
             try:
                 return self._escalate(prompt, category, rec)
             except Exception as e:
-                print(f"[router] escalade échouée ({e}) : repli local", file=sys.stderr)
+                print(f"[router] escalation failed ({e}): falling back to local", file=sys.stderr)
 
         rec["route"] = "local_lowconf" if local_answer else "fallback"
         return local_answer or "Unable to answer."
