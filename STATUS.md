@@ -11,7 +11,7 @@
 
 ## Reste à faire (par priorité)
 1. `make setup-llm && make model` puis `make eval` : mesurer l'accuracy réelle du LLM local et le temps par tâche (budget 10 min pour 19 tâches sur 2 vCPU — si trop lent, réduire `local.max_tokens` ou passer `gate.self_consistency.enabled: false`).
-2. `make build && make run && make size` : valider le conteneur de bout en bout (build llama-cpp via roues CPU précompilées — si l'index est indisponible, voir le commentaire dans le Dockerfile).
+2. `make build && make run && make size` : valider le conteneur de bout en bout (⚠️ Docker indisponible sur cette machine au 9/07 au soir — démarrer Docker Desktop d'abord ; build llama-cpp via roues CPU précompilées, si l'index est indisponible voir le commentaire dans le Dockerfile).
 3. Quand les crédits Fireworks arrivent : `.env` + `FIREWORKS_MODE=live`, éval sur 2-3 tâches d'abord (soumissions rate-limited).
 4. Calibrer les seuils du gate sur l'éval locale : viser 17/19, escalader math/logic/debug si le local est faible (`escalation.always`).
 5. Pousser l'image en public (linux/amd64) et soumettre. Deadline : 11 juillet 18h CET.
