@@ -6,3 +6,9 @@ models/
 local_io/
 *.gguf
 .DS_Store
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
