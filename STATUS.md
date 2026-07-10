@@ -1,5 +1,20 @@
 # STATUS — July 10, 2026 (deadline: July 11, 6pm CET)
 
+## Competitive intel (July 10 — 16 public repos analyzed, see README acknowledgements)
+- Serious Track 1 rivals: yassai (claims 19/19 @ 4,826 tk — batched, zero local resolution),
+  frugal-router (Qwen3-1.7B local + self-consistency, qualification-first), token-router
+  (16/19 measured on leaderboard), Minimalist (heavy verification arsenal). None validated a
+  local pipeline in the real 4GB/2vCPU env; our ~1k token profile beats all published numbers
+  IF our gate holds.
+- **The leaderboard keeps the LAST submitted score, not the best** (frugal-router's hard lesson)
+  → once a passing score lands, freeze; resubmit only for strict improvements or failures.
+- Hardening applied from their lessons: defensive ALLOWED_MODELS parsing, cgroup-aware thread
+  count, soft 480 s deadline, ast.parse gate on code, non-English drift penalty, exact-label
+  instruction for logic, extra_params knob (reasoning_effort — test with real credits first:
+  minimax-m3 improves, gemma-4 returns EMPTY under it).
+- Next token lever if ever needed: batch the ~6 escalations into 1-2 calls (yassai measured
+  -79% from batching; for us est. ~1,050 → ~700). Riskier parsing — only after a posted score.
+
 ## Model calibration on REAL model families (July 10, via Mammouth as stand-in proxy)
 Full cascade (local Qwen2.5-3B + 6 escalations), same 19-task eval:
 - **kimi-k2.7-code: 19/19, 1,059 tokens** ← model_preference now kimi-first everywhere

@@ -9,6 +9,21 @@ import sys
 from .config import by_category
 
 
+def available_cpus():
+    """Docker CPU quotas lie to os.cpu_count(): a 2-vCPU cgroup on a 32-core
+    host reports 32 cores, and llama.cpp thrashes with 16x too many threads.
+    Read the cgroup v2 quota when present (credit: Anbu-00001/Minimalist
+    documented this exact failure mode)."""
+    try:
+        with open("/sys/fs/cgroup/cpu.max", encoding="ascii") as f:
+            quota, period = f.read().split()[:2]
+        if quota != "max":
+            return max(1, int(int(quota) / int(period)))
+    except Exception:
+        pass
+    return os.cpu_count() or 2
+
+
 class LocalLLM:
     def __init__(self, cfg):
         self.cfg = cfg["local"]
@@ -27,7 +42,7 @@ class LocalLLM:
             print(f"[local_llm] model not found ({path}): local inference disabled",
                   file=sys.stderr)
             return
-        n_threads = self.cfg.get("n_threads") or os.cpu_count() or 2
+        n_threads = self.cfg.get("n_threads") or available_cpus()
         try:
             self._llm = Llama(model_path=path, n_ctx=self.cfg["n_ctx"],
                               n_threads=n_threads, verbose=False)

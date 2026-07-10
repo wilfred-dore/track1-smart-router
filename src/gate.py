@@ -4,6 +4,7 @@ score() returns a confidence in [0, 1]; the router compares it against the
 per-category threshold from config.yaml to decide whether to keep the local
 answer or escalate.
 """
+import ast
 import re
 
 _HEDGES = ("i don't know", "i do not know", "i cannot", "i can't", "as an ai",
@@ -25,6 +26,39 @@ def _degenerate(answer):
     return False
 
 
+def _non_latin_ratio(text):
+    """Answers must be in English; small local models occasionally drift into
+    other scripts (idea credit: my5757980/amd-hackathon-track1)."""
+    if not text:
+        return 0.0
+    return sum(1 for ch in text if ord(ch) > 0x24F) / len(text)
+
+
+_SENT_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
+
+
+def _requested_sentences(prompt):
+    m = re.search(r"\b(?:in|exactly)\s+(one|two|three|four|five|\d+)\s+sentences?\b",
+                  prompt.lower())
+    if not m:
+        return None
+    return _SENT_WORDS.get(m.group(1)) or int(m.group(1))
+
+
+def _fenced_code_parses(answer):
+    """ast.parse a fenced Python block: broken code should escalate, not ship
+    (idea credit: VisistaJayanti/AMD_Hackathon_Track1's deterministic validators).
+    Returns None when there is no fenced block to check reliably."""
+    m = re.search(r"```(?:python)?\s*\n?(.*?)```", answer, re.S)
+    if not m or not m.group(1).strip():
+        return None
+    try:
+        ast.parse(m.group(1))
+        return True
+    except SyntaxError:
+        return False
+
+
 def score(prompt, answer, category):
     if not answer or not answer.strip():
         return 0.0
@@ -35,6 +69,8 @@ def score(prompt, answer, category):
     s = 0.7
     if any(h in low for h in _HEDGES):
         s -= 0.4
+    if _non_latin_ratio(a) > 0.15:  # responses must be in English
+        s -= 0.5
 
     if category == "math":
         s += 0.2 if re.search(r"-?\d", a) else -0.5
@@ -44,8 +80,11 @@ def score(prompt, answer, category):
         s += 0.2 if re.search(r"\b(person|organi[sz]ation|location|date|org)\b", low) else -0.3
     elif category in ("code_debugging", "code_generation"):
         s += 0.2 if ("def " in a or "```" in a or "return" in a) else -0.4
+        if _fenced_code_parses(a) is False:  # syntactically broken code
+            s -= 0.35
     elif category == "summarization":
-        if "one sentence" in prompt.lower() and len(_sentences(a)) > 1:
+        limit = _requested_sentences(prompt)
+        if limit and len(_sentences(a)) > limit:
             s -= 0.3
         if len(a) >= len(prompt):  # a summary longer than its source is suspect
             s -= 0.3

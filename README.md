@@ -83,6 +83,23 @@ eval/tasks/          19 fixtures (8 guide practice tasks + 11 variants)
 eval/run_eval.py     accuracy n/19 + tokens, per-category table
 ```
 
+## Acknowledgements
+
+Ideas adapted from public hackathon repositories (studied, credited, not copied):
+- [Anbu-00001/Minimalist](https://github.com/Anbu-00001/Minimalist) — reading the cgroup v2
+  `cpu.max` quota instead of trusting `os.cpu_count()` under Docker CPU limits; the insight
+  that LLM judges penalize answers that don't reuse the question's exact labels.
+- [DavidOrtsac/frugal-router](https://github.com/DavidOrtsac/frugal-router) — defensive
+  parsing of harness-injected `ALLOWED_MODELS` (formats vary; they lost seven submissions to this).
+- [omerdduran/token-router](https://github.com/omerdduran/token-router) — leaderboard-measured
+  behavior of `reasoning_effort=none` per model (drives our `escalation.extra_params` knob).
+- [VisistaJayanti/AMD_Hackathon_Track1](https://github.com/VisistaJayanti/AMD_Hackathon_Track1) —
+  deterministic zero-token validators as escalation gates (our `ast.parse` check on code answers).
+- [my5757980/amd-hackathon-track1](https://github.com/my5757980/amd-hackathon-track1) —
+  non-English drift detector for small local models.
+- [ashaibani/yassai](https://github.com/ashaibani/yassai) — internal soft deadline under the
+  10-minute limit; evidence that batching escalations is the next big token lever.
+
 ## Pre-submission checklist
 
 - [ ] `make eval` ≥ 16/19 locally with the local LLM active

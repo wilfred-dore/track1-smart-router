@@ -75,7 +75,7 @@ escalation:
     ner: "List entities as 'text - type' only."
     code_debugging: "State the bug in one line, then the corrected code only."
     code_generation: "Return only the code."
-    logic: "Give the answer first, then one line of reasoning."
+    logic: "Give the answer first using the exact names/labels from the question, then one line of reasoning."
     factual: "Two sentences maximum."
   max_tokens:            # tight output contract per category (Fireworks tokens)
     default: 200
@@ -89,6 +89,10 @@ escalation:
     code_generation: 350
   max_prompt_chars: 6000 # truncate abnormally long prompts before sending
   stop: []
+  extra_params: {}       # passed verbatim to the chat API (extra_body). Candidate once
+                         # real credits arrive: {reasoning_effort: none} — measured by
+                         # omerdduran/token-router: minimax-m3 16/19 with it, but
+                         # gemma-4 returns EMPTY content under it. Test before enabling.
   model_preference:      # substrings matched against ALLOWED_MODELS (env) at runtime
     # Calibrated 2026-07-10 via Mammouth on the real model families:
     # kimi-k2.7-code 19/19 @ 1,059 tk vs minimax-m3 18/19 @ 1,622 tk
@@ -101,4 +105,7 @@ mock:
   completion_ratio: 0.6  # simulated output tokens = ratio * max_tokens (conservative estimate)
 
 limits:
-  per_task_seconds: 25   # beyond this: warning in the logs only
+  per_task_seconds: 25        # beyond this: warning in the logs only
+  total_budget_seconds: 480   # soft deadline (grading limit: 600 s). Past it, the router
+                              # skips slow local inference and goes solver/escalation only,
+                              # so the run always finishes with a complete results.json.

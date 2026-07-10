@@ -39,4 +39,7 @@ COPY src ./src
 ENV LOCAL_MODEL_PATH=/models/model.gguf \
     PYTHONUNBUFFERED=1
 
+LABEL org.opencontainers.image.source="https://github.com/wilfred-dore/track1-smart-router" \
+      org.opencontainers.image.description="Smart Router — AMD Developer Hackathon ACT II, Track 1"
+
 CMD ["python", "-m", "src.main"]

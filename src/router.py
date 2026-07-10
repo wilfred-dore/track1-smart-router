@@ -49,6 +49,9 @@ class Router:
         self.local = local
         self.fw = fw
         self._cache = {}
+        budget = cfg["limits"].get("total_budget_seconds")
+        self.deadline = (time.monotonic() + budget) if budget else None
+        self._rushed = False
 
     def solve(self, task):
         t0 = time.time()
@@ -82,9 +85,15 @@ class Router:
                 return result[0]
 
         # [2] local LLM + [3] confidence gate -> 0 tokens
+        # Past the soft time budget, skip local inference (the slow stage) so the
+        # container always finishes well under the 10-minute grading limit.
         ecfg = self.cfg["escalation"]
         local_answer = None
-        if category not in (ecfg["always"] or []):
+        if self.deadline and not self._rushed and time.monotonic() > self.deadline:
+            self._rushed = True
+            print("[router] soft time budget exceeded: switching to solver/escalation only",
+                  file=sys.stderr)
+        if category not in (ecfg["always"] or []) and not self._rushed:
             local_answer = self.local.generate(prompt, category)
             if local_answer:
                 if not self.cfg["gate"]["enabled"]:
@@ -124,7 +133,8 @@ class Router:
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": prompt[:ecfg["max_prompt_chars"]]}],
             max_tokens=by_category(ecfg["max_tokens"], category),
-            stop=ecfg.get("stop") or None)
+            stop=ecfg.get("stop") or None,
+            extra_params=ecfg.get("extra_params") or None)
         rec.update(route="fireworks", model=model,
                    tokens=usage["prompt_tokens"] + usage["completion_tokens"])
         return text or "Unable to answer."

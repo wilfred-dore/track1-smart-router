@@ -65,7 +65,7 @@ class MockFireworksClient(_UsageTracker):
         super().__init__()
         self.completion_ratio = completion_ratio
 
-    def chat(self, model, messages, max_tokens, stop=None):
+    def chat(self, model, messages, max_tokens, stop=None, extra_params=None):
         prompt_toks = sum(approx_tokens(m["content"]) for m in messages)
         completion_toks = max(1, math.ceil(max_tokens * self.completion_ratio))
         usage = self._record(prompt_toks, completion_toks)
@@ -81,10 +81,11 @@ class FireworksClient(_UsageTracker):
         self._client = OpenAI(base_url=os.environ["FIREWORKS_BASE_URL"],
                               api_key=os.environ["FIREWORKS_API_KEY"])
 
-    def chat(self, model, messages, max_tokens, stop=None):
+    def chat(self, model, messages, max_tokens, stop=None, extra_params=None):
         resp = self._client.chat.completions.create(
             model=model, messages=messages, max_tokens=max_tokens,
-            stop=stop or None, temperature=0)
+            stop=stop or None, temperature=0,
+            extra_body=extra_params or None)
         text = extract_text(resp.choices[0].message)
         if resp.usage:
             usage = self._record(resp.usage.prompt_tokens, resp.usage.completion_tokens)
@@ -104,10 +105,22 @@ def get_client(cfg):
     return MockFireworksClient(cfg["mock"]["completion_ratio"])
 
 
+def parse_allowed_models(raw):
+    """Defensive parsing of ALLOWED_MODELS: harness formats vary (plain CSV,
+    JSON-ish arrays, quotes, stray whitespace). A model name sent with a stray
+    bracket or quote is an instant MODEL_VIOLATION."""
+    cleaned = []
+    for part in re.split(r"[,;\n]", raw or ""):
+        model = part.strip().strip("[]\"' \t")
+        if model:
+            cleaned.append(model)
+    return cleaned
+
+
 def resolve_model(category, cfg):
     """Pick a model from ALLOWED_MODELS (env, never hardcoded) using the
     per-category preferences from config.yaml (substring matching)."""
-    allowed = [m.strip() for m in os.environ.get("ALLOWED_MODELS", "").split(",") if m.strip()]
+    allowed = parse_allowed_models(os.environ.get("ALLOWED_MODELS", ""))
     prefs = by_category(cfg["escalation"]["model_preference"], category) or []
     for pref in prefs:
         for model in allowed:
