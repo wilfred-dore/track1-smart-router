@@ -71,13 +71,15 @@ escalation:
   always: [math, logic, factual]
   system_prompt: "Answer directly and concisely in English. No preamble, do not restate the question."
   category_instructions:
-    math: "Give the final numeric answer with at most two short lines of working."
+    # Measured via Mammouth/kimi 2026-07-10: answer-only keeps 19/19 (kimi bills
+    # its internal thinking anyway, visible working is redundant) and saves 15%.
+    math: "Give only the final numeric answer."
     sentiment: "Give the label and one short justification."
     summarization: "Respect the requested length exactly."
     ner: "List entities as 'text - type' only."
     code_debugging: "State the bug in one line, then the corrected code only."
     code_generation: "Return only the code."
-    logic: "Give the answer first using the exact names/labels from the question, then one line of reasoning."
+    logic: "Answer with only the correct name or label, using the exact wording from the question."
     factual: "Two sentences maximum."
   max_tokens:            # tight output contract per category (Fireworks tokens)
     default: 200
@@ -85,8 +87,8 @@ escalation:
     summarization: 100
     ner: 150
     factual: 120
-    math: 200
-    logic: 150
+    math: 150
+    logic: 120
     code_debugging: 350
     code_generation: 350
   max_prompt_chars: 6000 # truncate abnormally long prompts before sending
