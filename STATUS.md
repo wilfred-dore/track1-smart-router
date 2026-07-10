@@ -1,5 +1,19 @@
 # STATUS — July 10, 2026 (deadline: July 11, 6pm CET)
 
+## Submission ladder log (tags are instant rollbacks)
+- v11 all-escalated: **scored 94.7% @ 6,559 tk** (rank ~17-20 at the time)
+- v12 single mixed batch + local summ/code: **FAILED gate @ 73.7%** — post-mortem:
+  (a) no truncation guard: a length-cut batch ships plausible garbage fragments
+  (reproduced on Mammouth, costs ~4 tasks); (b) heterogeneous batch interference
+  (literature: 5-15pp). Both fixed in v15. Lesson confirmed: ANY form re-save
+  replaces the score — the video upload re-save is what triggered v12's eval.
+- v15 (submitted 13:2x): grouped batches by task type, finish_reason=length guard,
+  spaCy NER (rule-overrides + self-demotion), sentiment/NER solvers, local
+  summarization/code. Validated 19/19 on 5/6 Mammouth runs @ 800-1,150 tk.
+  Leader to beat: 2,664 tk @ 84.2%. If v15 fails: resubmit v11 (guaranteed 94.7%),
+  then descend more carefully.
+- Eval cycle is now fast (~12 min) — iteration is cheap again.
+
 ## Competitive intel (July 10 — 16 public repos analyzed, see README acknowledgements)
 - Serious Track 1 rivals: yassai (claims 19/19 @ 4,826 tk — batched, zero local resolution),
   frugal-router (Qwen3-1.7B local + self-consistency, qualification-first), token-router
