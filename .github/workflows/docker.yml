@@ -29,8 +29,13 @@ jobs:
       - name: Set image name (GHCR requires lowercase)
         id: img
         run: |
-          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/track1-smart-router:latest" >> "$GITHUB_OUTPUT"
-          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/track1-smart-router:latest" >> "$GITHUB_ENV"
+          base="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/track1-smart-router"
+          echo "image=${base}:latest" >> "$GITHUB_OUTPUT"
+          # Versioned tag too: lablab's evaluator seems to re-enqueue only when
+          # the submitted image reference string actually changes.
+          echo "vtag=${base}:v${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE=${base}:latest" >> "$GITHUB_ENV"
+          echo "VTAG=${base}:v${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -39,7 +44,9 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
-          tags: ${{ steps.img.outputs.image }}
+          tags: |
+            ${{ steps.img.outputs.image }}
+            ${{ steps.img.outputs.vtag }}
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -80,4 +87,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push
-        run: docker push "$IMAGE"
+        run: |
+          docker push "$IMAGE"
+          docker push "$VTAG"
+          echo "### Submit this reference:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$VTAG" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
