@@ -17,7 +17,7 @@ solvers:
   # exact-arithmetic solver stays; sentiment lexicon and NER gazetteers are too
   # risky on unseen variants until the gate is passed. Descend the ladder
   # (re-add: sentiment, ner, factual) one submission at a time AFTER a pass.
-  use: [math]
+  use: [math, sentiment, ner]
   min_confidence: 0.75   # below this, ignore the solver and fall through to the local LLM
 
 local:
@@ -76,7 +76,7 @@ escalation:
   # categories return to the local 3B — summarization (sentence-count check;
   # long source passages never reach the paid API) and code (ast.parse gate).
   # Unverifiable ones stay escalated.
-  always: [math, logic, factual, sentiment, ner]
+  always: [math, logic, factual]
   system_prompt: "Answer directly and concisely in English. No preamble, do not restate the question."
   category_instructions:
     # Measured via Mammouth/kimi 2026-07-10: answer-only keeps 19/19 (kimi bills
@@ -108,6 +108,7 @@ escalation:
   batch:                 # RUNG 1 of the descent (gate passed 94.7% on July 10): one
     enabled: true        # thinking session + one system prompt instead of 18. Parse
     max_tasks: 10        # failures fall back to per-task calls (validated in mock).
+    timeout_seconds: 90  # a grouped call takes longer than a single-task one
   max_prompt_chars: 6000 # truncate abnormally long prompts before sending
   stop: []
   extra_params: {}       # passed verbatim to the chat API (extra_body). Candidate once

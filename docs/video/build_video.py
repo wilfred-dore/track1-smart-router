@@ -23,10 +23,13 @@ EDGE_VOICE = "en-US-AndrewNeural"
 GRADIUM_VOICE_ID = os.environ.get("GRADIUM_VOICE_ID", "POBHtemksfWQbng0")  # Garrett
 TAIL_SILENCE = 1.0  # seconds of slide hold after the narration ends
 
+# The narration deliberately avoids first-person identity claims: a synthetic
+# voice must not present itself as a real person. Attribution lives in the
+# slides, the README, and the repository.
 NARRATION = [
     # Slide 1 — title
-    "Hi, I'm Wilfred Doré, and this is Smart Router, my entry for Track 1 of the "
-    "AMD Developer Hackathon: a general-purpose AI agent that handles natural "
+    "This is Smart Router, team Robot ROCm's entry for Track 1 of the AMD "
+    "Developer Hackathon: a general-purpose AI agent that handles natural "
     "language tasks while spending as few Fireworks tokens as possible.",
     # Slide 2 — problem
     "Track 1 mirrors a real enterprise problem: not every task deserves a premium "
@@ -59,8 +62,10 @@ NARRATION = [
     # Slide 6 — takeaways
     "Three takeaways. Answer at zero cost first. Route by reliability, not by "
     "difficulty. And plumbing wins hackathons: most failed submissions break on "
-    "infrastructure, so the CI reproduces the grading environment exactly. The "
-    "image is public, linux amd64, weights bundled. Thanks for watching.",
+    "infrastructure, so the CI reproduces the grading environment exactly. "
+    "Techniques adapted from publicly shared competitor write-ups are credited "
+    "in the repository. The image is public, linux amd64, weights bundled. "
+    "Thanks for watching.",
 ]
 
 

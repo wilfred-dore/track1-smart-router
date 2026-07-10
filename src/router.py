@@ -132,6 +132,30 @@ class Router:
             self._defer_escalation = False
         return rec
 
+    @staticmethod
+    def _parse_batch_answers(text, ids):
+        """Map task ids to answers from a batched response. Models don't always
+        obey the JSON instruction (kimi sometimes answers as a markdown list),
+        so parse both: a JSON object, else '[id] answer' segments."""
+        m = re.search(r"\{.*\}", text, re.S)
+        if m:
+            try:
+                data = json.loads(m.group(0))
+                return {str(k): str(v).strip() for k, v in data.items() if str(v).strip()}
+            except Exception:
+                pass
+        markers = sorted((mm.start(), mm.end(), tid)
+                         for tid in ids
+                         for mm in re.finditer(re.escape(f"[{tid}]"), text))
+        answers = {}
+        for i, (start, end, tid) in enumerate(markers):
+            stop = markers[i + 1][0] if i + 1 < len(markers) else len(text)
+            seg = text[end:stop].strip()
+            seg = re.sub(r"^[\s*:>\-]*(\([a-z_ ]+\))?[\s*:>\-]*", "", seg).strip()
+            if seg:
+                answers.setdefault(tid, seg)
+        return answers
+
     def _escalate_batch(self, chunk):
         """One Fireworks call for several tasks; per-task fallback on any miss."""
         ecfg = self.cfg["escalation"]
@@ -140,12 +164,12 @@ class Router:
         guidance = " ".join(f"[{c}] {instructions[c]}" for c in categories if c in instructions)
         system = (ecfg["system_prompt"] + " You will receive several independent tasks, "
                   "each tagged with an id and category. Answer each one independently. "
-                  "Return ONLY a JSON object mapping each id to its answer string. "
+                  'Return ONLY a JSON object mapping each id (exactly as given in '
+                  'brackets) to its answer string, like {"id-1": "answer", ...}. '
                   + guidance)
         user = "\n\n".join(f"[{r['task_id']}] ({r['category']}) "
                            f"{r['prompt'][:ecfg['max_prompt_chars']]}" for r in chunk)
         budget = sum(by_category(ecfg["max_tokens"], r["category"]) for r in chunk)
-        answers = {}
         try:
             model = resolve_model("default", self.cfg)
             text, usage = self.fw.chat(
@@ -154,14 +178,16 @@ class Router:
                           {"role": "user", "content": user}],
                 max_tokens=min(budget, 2000),
                 stop=ecfg.get("stop") or None,
-                extra_params=ecfg.get("extra_params") or None)
-            m = re.search(r"\{.*\}", text, re.S)
-            answers = {str(k): str(v) for k, v in json.loads(m.group(0)).items()} if m else {}
+                extra_params=ecfg.get("extra_params") or None,
+                # A grouped call legitimately takes longer than a single one;
+                # the 25 s default was killing every batch on slow upstreams.
+                timeout=(ecfg.get("batch") or {}).get("timeout_seconds") or 90)
+            answers = self._parse_batch_answers(text, [r["task_id"] for r in chunk])
             per_task = (usage["prompt_tokens"] + usage["completion_tokens"]) // max(1, len(chunk))
             for rec in chunk:
-                if rec["task_id"] in answers and answers[rec["task_id"]].strip():
+                if answers.get(rec["task_id"]):
                     rec.update(route="fireworks_batch", model=model, tokens=per_task,
-                               answer=answers[rec["task_id"]].strip())
+                               answer=answers[rec["task_id"]])
         except Exception as e:
             print(f"[router] batch escalation failed ({e}): per-task fallback", file=sys.stderr)
         for rec in chunk:  # anything the batch missed goes through the normal path

@@ -65,7 +65,8 @@ class MockFireworksClient(_UsageTracker):
         super().__init__()
         self.completion_ratio = completion_ratio
 
-    def chat(self, model, messages, max_tokens, stop=None, extra_params=None):
+    def chat(self, model, messages, max_tokens, stop=None, extra_params=None,
+             timeout=None):
         prompt_toks = sum(approx_tokens(m["content"]) for m in messages)
         completion_toks = max(1, math.ceil(max_tokens * self.completion_ratio))
         usage = self._record(prompt_toks, completion_toks)
@@ -82,8 +83,10 @@ class FireworksClient(_UsageTracker):
                               api_key=os.environ.get("FIREWORKS_API_KEY") or "not-provided",
                               timeout=25.0)  # per-request rule is 30 s
 
-    def chat(self, model, messages, max_tokens, stop=None, extra_params=None):
-        resp = self._client.chat.completions.create(
+    def chat(self, model, messages, max_tokens, stop=None, extra_params=None,
+             timeout=None):
+        client = self._client if timeout is None else self._client.with_options(timeout=timeout)
+        resp = client.chat.completions.create(
             model=model, messages=messages, max_tokens=max_tokens,
             stop=stop or None, temperature=0,
             extra_body=extra_params or None)
