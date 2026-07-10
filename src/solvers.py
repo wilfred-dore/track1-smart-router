@@ -108,6 +108,67 @@ def solve_sentiment(prompt):
 
 # ---------------------------------------------------------------------- ner
 
+# Statistical NER backend (spaCy en_core_web_sm, ~13 MB, CPU): generalizes to
+# entities our gazetteers have never seen. Selected via solvers.ner_backend;
+# falls back to the rule-based solver when unavailable.
+NER_BACKEND = "rules"
+_SPACY_NLP = None
+_SPACY_LABELS = {"PERSON": "person", "ORG": "organization", "GPE": "location",
+                 "LOC": "location", "FAC": "location", "NORP": "organization",
+                 "DATE": "date", "TIME": "date"}
+
+
+def _spacy_model():
+    global _SPACY_NLP
+    if _SPACY_NLP is None:
+        try:
+            import spacy
+            _SPACY_NLP = spacy.load("en_core_web_sm")
+        except Exception:
+            _SPACY_NLP = False
+    return _SPACY_NLP
+
+
+def solve_ner_spacy(prompt):
+    nlp = _spacy_model()
+    if not nlp:
+        return None
+    m = re.search(r"from\s*:\s*(.+)$", prompt, re.I | re.S)
+    text = (m.group(1) if m else (prompt.split(":", 1)[1] if ":" in prompt else prompt)).strip()
+    entities, covered = [], []
+    for ent in nlp(text).ents:
+        kind = _SPACY_LABELS.get(ent.label_)
+        if not kind:
+            continue
+        if kind == "date" and not re.search(
+                r"\d|january|february|march|april|may|june|july|august|september"
+                r"|october|november|december|monday|tuesday|wednesday|thursday"
+                r"|friday|saturday|sunday|yesterday|today|tomorrow|last |next ",
+                ent.text.lower()):
+            continue  # adjective-only DATE spans ('annual') are false positives
+        # Rule signals beat the statistical label: an 'AI'/'Inc' suffix is an
+        # organization even when spaCy tags the span GPE (e.g. 'Fireworks AI').
+        if ent.text.split()[-1].lower() in _ORG_SUFFIXES or ent.text.endswith("AI"):
+            kind = "organization"
+        entities.append((ent.start_char, ent.text, kind))
+        covered.append((ent.start_char, ent.end_char))
+    if not entities:
+        return None
+    # Any capitalized span spaCy left unlabeled is a probable missed entity:
+    # ship nothing half-confident, let the LLM path complete it instead.
+    missed = 0
+    for m in re.finditer(r"\b[A-Z][\w'-]+", text):
+        token = m.group(0)
+        if (token in _SKIP_WORDS
+                or token.rstrip(".").lower() in _TITLES
+                or token in ("CEO", "CTO", "CFO", "COO", "CIO", "VP", "PhD", "MD")):
+            continue
+        if not any(s <= m.start() < e for s, e in covered):
+            missed += 1
+    answer = "; ".join(f"{t} - {k}" for _, t, k in entities)
+    return answer, (0.85 if len(entities) >= 2 and missed == 0 else 0.5)
+
+
 _MONTHS = ("January", "February", "March", "April", "May", "June", "July",
            "August", "September", "October", "November", "December")
 _ORG_SUFFIXES = {"ai", "inc", "inc.", "corp", "corp.", "ltd", "llc", "gmbh", "labs",
@@ -239,9 +300,11 @@ _SOLVERS = {
 
 def solve(prompt, category):
     solver = _SOLVERS.get(category)
+    if category == "ner" and NER_BACKEND == "spacy":
+        solver = solve_ner_spacy
     if not solver:
         return None
     try:
-        return solver(prompt)
+        return solver(prompt) or (_SOLVERS["ner"](prompt) if category == "ner" else None)
     except Exception:
         return None

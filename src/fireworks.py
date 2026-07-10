@@ -96,6 +96,7 @@ class FireworksClient(_UsageTracker):
         else:  # fallback estimate if the proxy does not return usage
             usage = self._record(sum(approx_tokens(m["content"]) for m in messages),
                                  approx_tokens(text))
+        usage["finish_reason"] = resp.choices[0].finish_reason
         return text, usage
 
 

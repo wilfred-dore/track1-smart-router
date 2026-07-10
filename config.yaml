@@ -19,6 +19,9 @@ solvers:
   # (re-add: sentiment, ner, factual) one submission at a time AFTER a pass.
   use: [math, sentiment, ner]
   min_confidence: 0.75   # below this, ignore the solver and fall through to the local LLM
+  ner_backend: spacy     # statistical NER (en_core_web_sm) with rule-signal label fixes;
+                         # self-demotes when a capitalized token stays unlabeled.
+                         # 'rules' = gazetteer-only fallback (also used if spaCy is missing)
 
 local:
   model_path: models/model.gguf     # override: LOCAL_MODEL_PATH (=/models/model.gguf in the image)

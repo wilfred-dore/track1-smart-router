@@ -50,6 +50,7 @@ class Router:
         self.cfg = cfg
         self.local = local
         self.fw = fw
+        solvers.NER_BACKEND = cfg["solvers"].get("ner_backend", "rules")
         self._cache = {}
         budget = cfg["limits"].get("total_budget_seconds")
         self.deadline = (time.monotonic() + budget) if budget else None
@@ -176,12 +177,19 @@ class Router:
                 model=model,
                 messages=[{"role": "system", "content": system},
                           {"role": "user", "content": user}],
-                max_tokens=min(budget, 2000),
+                max_tokens=min(budget, 4000),
                 stop=ecfg.get("stop") or None,
                 extra_params=ecfg.get("extra_params") or None,
                 # A grouped call legitimately takes longer than a single one;
                 # the 25 s default was killing every batch on slow upstreams.
                 timeout=(ecfg.get("batch") or {}).get("timeout_seconds") or 90)
+            if usage.get("finish_reason") == "length":
+                # Truncated batch: every parsed segment is suspect (a cut-off
+                # markdown list still yields plausible-looking fragments).
+                # Ship nothing from it; the per-task fallback below covers all.
+                print("[router] batch truncated (finish_reason=length): "
+                      "discarding batch output, per-task fallback", file=sys.stderr)
+                raise RuntimeError("batch truncated")
             answers = self._parse_batch_answers(text, [r["task_id"] for r in chunk])
             per_task = (usage["prompt_tokens"] + usage["completion_tokens"]) // max(1, len(chunk))
             for rec in chunk:
