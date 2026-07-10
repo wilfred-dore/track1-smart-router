@@ -73,12 +73,63 @@ against those three facts, not against generic LLM-cost folklore.
 | Policy sweep instead of hyperparameter search (3 qualitative configs × full eval) | ✅ chose the routing policy |
 | Escalation batching design (map task_ids in one structured call, per-task fallback on parse failure) | 🕐 designed, unimplemented — next lever |
 
-## 4. Libraries & curated lists
+## 4. Libraries & curated lists (researched July 10)
 
-*Pending: a research sweep of prompt-compression libraries (LLMLingua et al.),
-routing frameworks (RouteLLM), semantic caches (GPTCache), GitHub's
-`token-compression` topic, and awesome-lists — with per-tool verdicts for this
-scoring model. Will be merged here when the review completes.*
+**Category verdict up front: the entire prompt-compression ecosystem targets
+1k-100k-token contexts and does not pay off below ~1-2k tokens.** Our escalated
+prompts are 100-200 tokens — 10x below [leanctx](https://github.com/jia-gao/leanctx)'s
+own default activation threshold (`threshold_tokens: 2000`). Compressing short
+*instructions* (vs long *context*) degrades accuracy, which costs more than it saves.
+
+### Not applicable (researched and rejected with reasons)
+- [microsoft/LLMLingua / LLMLingua-2](https://github.com/microsoft/LLMLingua) — compresses the
+  *context* field and deliberately leaves instruction/question untouched; our prompts are ~100%
+  instruction/question.
+- [liyucheng09/Selective_Context](https://github.com/liyucheng09/Selective_Context) — same
+  long-context premise; dormant, no license.
+- [base76-research-lab/token-compressor](https://github.com/base76-research-lab/token-compressor) —
+  lossy rewrite by a local llama3.2:1b via Ollama (not in our image), validated only by cosine
+  similarity ≥ 0.85 (checks similarity, not task success); 10 stars.
+- [github.com/topics/token-compression](https://github.com/topics/token-compression) sweep —
+  two families dominate: coding-agent context tools ([claw-compactor](https://github.com/open-compress/claw-compactor),
+  squeez, tokless...) for multi-thousand-token workspaces, and vision-token pruning for VLMs.
+  Nothing targets sub-300-token prompts.
+- [lm-sys/RouteLLM](https://github.com/lm-sys/RouteLLM) — predicts "would GPT-4 beat Mixtral on
+  this chat prompt", not "can my bundled 3B solve this task"; dormant since Aug 2024.
+- [zilliztech/GPTCache](https://github.com/zilliztech/GPTCache) — semantic cache: ~0% hit rate on
+  19 distinct one-shot prompts, adds wrong-answer risk. ⚠️ Its cross-run persistence variant is
+  additionally **banned by the rules** ("do not hardcode or cache answers") — our cache stays
+  intra-run only.
+- [toon-format/toon](https://github.com/toon-format/toon) — token-efficient encoding for bulk
+  tabular data; our prompts carry none.
+- **Fireworks prompt caching** ([docs](https://docs.fireworks.ai/guides/prompt-caching)) —
+  discounts *dollars*, not the reported `usage.prompt_tokens` we are scored on.
+- Awesome-lists: [horseee/Awesome-Efficient-LLM](https://github.com/horseee/Awesome-Efficient-LLM)
+  (best index — every compression entry is long-context, confirming the category verdict),
+  [ZongqianLi/Prompt-Compression-Survey](https://github.com/ZongqianLi/Prompt-Compression-Survey)
+  (NAACL 2025 — the de-facto awesome-prompt-compression), xlite-dev/Awesome-LLM-Inference
+  (GPU serving-side, irrelevant to per-token API billing).
+
+### Worth testing once real credits arrive
+- **Fireworks grammar mode (GBNF)** ([docs](https://fireworks.ai/docs/structured-responses/structured-output-grammar-based)) —
+  server-side constrained decoding: completion = exactly the answer alphabet (1-3 tokens).
+  ⚠️ Caveat the research missed: our escalated categories (math, logic) *need* visible brief
+  working — token-router measured 16/19 → 12/19 when it was removed — and factual needs free
+  text. Grammar mode only helps if the answer-only accuracy holds; test, don't assume.
+- **Tokenizer arbitrage** — the same text bills very differently per model (measured up to 38%
+  between models); compare `usage` fields across kimi/minimax on identical prompts.
+- **Per-category stop sequences** — kill trailing elaboration the moment the answer is complete;
+  cheaper than max_tokens truncation. Config knob already exists (`escalation.stop`).
+
+### Post-score options (local-side, zero API tokens)
+- [spaCy](https://spacy.io/models/en) `en_core_web_sm` (~13 MB, MIT, NER F1≈0.845) — industrial
+  NER for the local tier; map OntoNotes labels to the task's expected labels.
+- [aurelio-labs/semantic-router](https://github.com/aurelio-labs/semantic-router) or an
+  Avengers-Pro-style nearest-centroid ([paper](https://arxiv.org/abs/2508.12631)) — embedding
+  classification if regex ever misroutes (it hasn't on our fixtures).
+- llama.cpp built-in GBNF grammars on the bundled 3B — force valid local answer formats,
+  fewer escalations; lighter than adding [outlines](https://github.com/dottxt-ai/outlines) or
+  [guidance](https://github.com/guidance-ai/guidance) to the image.
 
 ## 5. Remaining levers, ranked by expected value
 
