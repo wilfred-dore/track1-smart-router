@@ -1,4 +1,18 @@
-# STATUS — night of July 9-10, 2026
+# STATUS — July 10, 2026 (deadline: July 11, 6pm CET)
+
+## Model calibration on REAL model families (July 10, via Mammouth as stand-in proxy)
+Full cascade (local Qwen2.5-3B + 6 escalations), same 19-task eval:
+- **kimi-k2.7-code: 19/19, 1,059 tokens** ← model_preference now kimi-first everywhere
+- minimax-m3: 18/19, 1,622 tokens (reasoning overflowed into the answer on practice-01)
+Caveat: Fireworks' proxy may count tokens differently; re-check with 2-3 tasks once real credits arrive.
+
+## Submission assets (docs/)
+- Slides: docs/slides/smart-router-slides.pdf (Beamer, 6 slides, English)
+- Video: docs/video/smart-router-demo.mp4 (150 s, 1080p, English edge-tts voiceover; regenerate
+  with docs/video/build_video.py) + cover.png
+- Image live on GHCR (public, amd64 verified by anonymous pull): ghcr.io/wilfred-dore/track1-smart-router:latest
+- CI smoke test at grading limits: 19 tasks in 90 s, 1.97 GB compressed
+
 
 ## Calibration sweep (July 10) → final routing policy
 Three policies compared on the full eval (local 3B + mock escalation):

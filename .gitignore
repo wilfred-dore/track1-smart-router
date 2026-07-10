@@ -12,3 +12,6 @@ local_io/
 *.out
 *.snm
 *.toc
+.claude/settings.local.json
+docs/video/out/
+docs/video/*.mp4

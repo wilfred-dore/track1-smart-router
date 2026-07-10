@@ -90,7 +90,10 @@ escalation:
   max_prompt_chars: 6000 # truncate abnormally long prompts before sending
   stop: []
   model_preference:      # substrings matched against ALLOWED_MODELS (env) at runtime
-    default: [minimax]
+    # Calibrated 2026-07-10 via Mammouth on the real model families:
+    # kimi-k2.7-code 19/19 @ 1,059 tk vs minimax-m3 18/19 @ 1,622 tk
+    # (minimax reasoning overflowed into answers despite extract_text fallback)
+    default: [kimi, minimax]
     code_debugging: [kimi, minimax]
     code_generation: [kimi, minimax]
 
