@@ -15,3 +15,4 @@ local_io/
 .claude/settings.local.json
 docs/video/out/
 docs/video/*.mp4
+discord/
