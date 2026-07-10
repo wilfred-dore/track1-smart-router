@@ -91,6 +91,9 @@ escalation:
     logic: 120
     code_debugging: 350
     code_generation: 350
+  batch:                 # group escalations into one call (yassai measured batching as
+    enabled: false       # the dominant token lever). Single point of failure: parse
+    max_tasks: 10        # failures fall back to per-task calls. Enable after a posted score.
   max_prompt_chars: 6000 # truncate abnormally long prompts before sending
   stop: []
   extra_params: {}       # passed verbatim to the chat API (extra_body). Candidate once

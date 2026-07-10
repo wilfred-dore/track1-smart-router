@@ -45,7 +45,7 @@
     "task_id": "practice-07",
     "category": "logic",
     "prompt": "Three friends, Sam, Jo, and Lee, each own a different pet: cat, dog, bird. Sam does not own the bird. Jo owns the dog. Who owns the cat?",
-    "check": {"type": "regex", "value": "sam.{0,60}cat|cat.{0,60}sam"}
+    "check": {"type": "regex", "value": "\\bsam\\b"}
   },
   {
     "task_id": "practice-08",

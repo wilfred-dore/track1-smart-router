@@ -65,10 +65,11 @@ def main():
     cfg = load_config()
     router = Router(cfg, LocalLLM(cfg), get_client(cfg))
 
+    recs = router.solve_all([{"task_id": fx["task_id"], "prompt": fx["prompt"]}
+                             for fx in fixtures])
     rows = []
-    for fx in fixtures:
-        rec = router.solve({"task_id": fx["task_id"], "prompt": fx["prompt"]})
-        assumed = rec["route"] == "fireworks" and router.fw.is_mock
+    for fx, rec in zip(fixtures, recs):
+        assumed = str(rec["route"]).startswith("fireworks") and router.fw.is_mock
         rows.append({**rec, "expected_cat": fx["category"],
                      "ok": None if assumed else check(rec["answer"], fx["check"])})
 
@@ -85,7 +86,7 @@ def main():
         for r in rs:
             routes[r["route"]] += 1
         print(f"{cat:<16} {len(rs):>2} {routes['solver']:>6} {routes['local']:>5} "
-              f"{routes['fireworks']:>3} "
+              f"{routes['fireworks'] + routes['fireworks_batch']:>3} "
               f"{sum(1 for r in rs if r['ok'] is True):>3} "
               f"{sum(1 for r in rs if r['ok'] is None):>3} "
               f"{sum(1 for r in rs if r['ok'] is False):>3} "

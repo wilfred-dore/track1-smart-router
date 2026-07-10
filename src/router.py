@@ -1,8 +1,10 @@
 """Cascade: deterministic solvers -> local LLM -> gate -> Fireworks escalation.
 
 A single pass per task, never a loop: every extra Fireworks call costs
-tokens, hence leaderboard rank.
+tokens, hence leaderboard rank. Escalations can optionally be grouped into
+one batched call (escalation.batch) with per-task fallback on parse failure.
 """
+import json
 import re
 import sys
 import time
@@ -52,6 +54,7 @@ class Router:
         budget = cfg["limits"].get("total_budget_seconds")
         self.deadline = (time.monotonic() + budget) if budget else None
         self._rushed = False
+        self._defer_escalation = False
 
     def solve(self, task):
         t0 = time.time()
@@ -74,6 +77,101 @@ class Router:
         if elapsed > self.cfg["limits"]["per_task_seconds"]:
             print(f"[router] slow task ({elapsed:.1f}s): {rec['task_id']}", file=sys.stderr)
         return rec
+
+    def solve_all(self, tasks, on_result=None):
+        """Solve a task list. With escalation.batch enabled, the zero-token
+        stages run per task and all pending escalations are grouped into as few
+        Fireworks calls as possible; otherwise identical to per-task solve()."""
+        bcfg = (self.cfg["escalation"].get("batch") or {})
+        if not bcfg.get("enabled"):
+            results = []
+            for task in tasks:
+                rec = self._safe(self.solve, task)
+                results.append(rec)
+                if on_result:
+                    on_result(rec)
+            return results
+
+        results, pending = [], []
+        for task in tasks:
+            rec = self._safe(self.solve_local_only, task)
+            results.append(rec)
+            if rec["route"] == "pending_escalation":
+                pending.append(rec)
+            elif on_result:
+                on_result(rec)
+        for chunk_start in range(0, len(pending), int(bcfg.get("max_tasks") or 10)):
+            chunk = pending[chunk_start:chunk_start + int(bcfg.get("max_tasks") or 10)]
+            self._escalate_batch(chunk)
+            if on_result:
+                for rec in chunk:
+                    on_result(rec)
+        return results
+
+    def _safe(self, fn, task):
+        try:
+            return fn(task)
+        except Exception as e:
+            print(f"[router] task {task.get('task_id')} failed: {e}", file=sys.stderr)
+            return {"task_id": task.get("task_id"), "category": "?", "route": "error",
+                    "model": None, "tokens": 0, "answer": "Unable to answer.",
+                    "prompt": task.get("prompt", "")}
+
+    def solve_local_only(self, task):
+        """Zero-token stages only; marks the record 'pending_escalation' instead
+        of calling Fireworks (used by the batched path)."""
+        prompt = task["prompt"]
+        category = classify(prompt)
+        rec = {"task_id": task.get("task_id"), "category": category,
+               "route": None, "model": None, "tokens": 0, "answer": "",
+               "prompt": prompt}
+        self._defer_escalation = True
+        try:
+            rec["answer"] = self._solve_uncached(prompt, category, rec)
+        finally:
+            self._defer_escalation = False
+        return rec
+
+    def _escalate_batch(self, chunk):
+        """One Fireworks call for several tasks; per-task fallback on any miss."""
+        ecfg = self.cfg["escalation"]
+        instructions = ecfg.get("category_instructions") or {}
+        categories = sorted({r["category"] for r in chunk})
+        guidance = " ".join(f"[{c}] {instructions[c]}" for c in categories if c in instructions)
+        system = (ecfg["system_prompt"] + " You will receive several independent tasks, "
+                  "each tagged with an id and category. Answer each one independently. "
+                  "Return ONLY a JSON object mapping each id to its answer string. "
+                  + guidance)
+        user = "\n\n".join(f"[{r['task_id']}] ({r['category']}) "
+                           f"{r['prompt'][:ecfg['max_prompt_chars']]}" for r in chunk)
+        budget = sum(by_category(ecfg["max_tokens"], r["category"]) for r in chunk)
+        answers = {}
+        try:
+            model = resolve_model("default", self.cfg)
+            text, usage = self.fw.chat(
+                model=model,
+                messages=[{"role": "system", "content": system},
+                          {"role": "user", "content": user}],
+                max_tokens=min(budget, 2000),
+                stop=ecfg.get("stop") or None,
+                extra_params=ecfg.get("extra_params") or None)
+            m = re.search(r"\{.*\}", text, re.S)
+            answers = {str(k): str(v) for k, v in json.loads(m.group(0)).items()} if m else {}
+            per_task = (usage["prompt_tokens"] + usage["completion_tokens"]) // max(1, len(chunk))
+            for rec in chunk:
+                if rec["task_id"] in answers and answers[rec["task_id"]].strip():
+                    rec.update(route="fireworks_batch", model=model, tokens=per_task,
+                               answer=answers[rec["task_id"]].strip())
+        except Exception as e:
+            print(f"[router] batch escalation failed ({e}): per-task fallback", file=sys.stderr)
+        for rec in chunk:  # anything the batch missed goes through the normal path
+            if rec["route"] == "pending_escalation":
+                try:
+                    rec["answer"] = self._escalate(rec["prompt"], rec["category"], rec)
+                except Exception as e:
+                    print(f"[router] fallback escalation failed ({e})", file=sys.stderr)
+                    rec.update(route="fallback",
+                               answer=rec.get("local_answer") or "Unable to answer.")
 
     def _solve_uncached(self, prompt, category, rec):
         # [1] deterministic solvers -> 0 tokens
@@ -113,6 +211,10 @@ class Router:
 
         # [4] Fireworks escalation — only when necessary
         if ecfg["enabled"] and category not in (ecfg["never"] or []):
+            if self._defer_escalation:  # batched path: collect instead of calling
+                rec["route"] = "pending_escalation"
+                rec["local_answer"] = local_answer
+                return local_answer or ""
             try:
                 return self._escalate(prompt, category, rec)
             except Exception as e:

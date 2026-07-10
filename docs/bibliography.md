@@ -71,7 +71,7 @@ against those three facts, not against generic LLM-cost folklore.
 | Reasoning-model output recovery (`<think>` stripping + reasoning-field fallback) | ✅ shipped, caught a real empty-answer bug |
 | CI smoke test at the exact grading limits (amd64, 4 GB, 2 vCPU, timing + schema + size gates before any push) | ✅ caught the musl-wheel bug before a submission slot was burned |
 | Policy sweep instead of hyperparameter search (3 qualitative configs × full eval) | ✅ chose the routing policy |
-| Escalation batching design (map task_ids in one structured call, per-task fallback on parse failure) | 🕐 designed, unimplemented — next lever |
+| Escalation batching (one structured call, per-task fallback on parse failure) | ✅ implemented & validated: 19/19 @ 684 tokens in 1 call via Mammouth/kimi (-36% vs per-task); flag off until a passing score is posted |
 
 ## 4. Libraries & curated lists (researched July 10)
 

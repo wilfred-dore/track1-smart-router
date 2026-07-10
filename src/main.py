@@ -44,17 +44,14 @@ def main():
         os.replace(tmp_path, output_path)
 
     results = []
-    for task in tasks:
-        try:
-            rec = router.solve(task)
-        except Exception as e:
-            print(f"[main] task {task.get('task_id')} failed: {e}", file=sys.stderr)
-            rec = {"task_id": task.get("task_id"), "answer": "Unable to answer.",
-                   "route": "error", "tokens": 0}
+
+    def on_result(rec):
         results.append({"task_id": rec["task_id"], "answer": rec["answer"]})
         write_results(results)
         print(f"[main] {rec['task_id']}: route={rec.get('route')} "
               f"tokens={rec.get('tokens', 0)}", file=sys.stderr)
+
+    router.solve_all(tasks, on_result=on_result)
 
     usage = router.fw.usage_summary()
     print(f"[main] {len(results)} answers written to {output_path} "
