@@ -16,3 +16,4 @@ local_io/
 docs/video/out/
 docs/video/*.mp4
 discord/
+*.pdf
