@@ -2,10 +2,11 @@
 """Build the submission demo video from the Beamer slides.
 
 Pipeline: render each PDF page to a 1080p PNG (PyMuPDF), synthesize the
-narration per slide (edge-tts neural voice), assemble slide+voice segments
-with ffmpeg, then concatenate. Also exports slide 1 as the cover image.
+narration per slide (Gradium if GRADIUM_API_KEY is set, else edge-tts),
+assemble slide+voice segments with ffmpeg, then concatenate. Also exports
+slide 1 as the cover image.
 
-Usage: .venv/bin/python docs/video/build_video.py
+Usage: [GRADIUM_API_KEY=...] .venv/bin/python docs/video/build_video.py
 """
 import asyncio
 import json
@@ -18,7 +19,8 @@ import fitz  # PyMuPDF
 HERE = os.path.dirname(os.path.abspath(__file__))
 PDF = os.path.join(HERE, "..", "slides", "smart-router-slides.pdf")
 OUT = os.path.join(HERE, "out")
-VOICE = "en-US-AndrewNeural"
+EDGE_VOICE = "en-US-AndrewNeural"
+GRADIUM_VOICE_ID = os.environ.get("GRADIUM_VOICE_ID", "POBHtemksfWQbng0")  # Garrett
 TAIL_SILENCE = 1.0  # seconds of slide hold after the narration ends
 
 NARRATION = [
@@ -74,8 +76,17 @@ def duration_of(path):
 
 
 async def synthesize(text, path):
-    import edge_tts
-    await edge_tts.Communicate(text, VOICE).save(path)
+    api_key = os.environ.get("GRADIUM_API_KEY")
+    if api_key:
+        import gradium
+        client = gradium.GradiumClient(api_key=api_key)
+        setup = {"voice_id": GRADIUM_VOICE_ID, "output_format": "wav"}
+        result = await gradium.speech.tts(client, setup, text)
+        with open(path, "wb") as f:
+            f.write(result.raw_data)
+    else:
+        import edge_tts
+        await edge_tts.Communicate(text, EDGE_VOICE).save(path)
 
 
 def main():
@@ -89,7 +100,8 @@ def main():
         zoom = 1920 / page.rect.width
         page.get_pixmap(matrix=fitz.Matrix(zoom, zoom)).save(png)
 
-        mp3 = os.path.join(OUT, f"voice{i + 1}.mp3")
+        ext = "wav" if os.environ.get("GRADIUM_API_KEY") else "mp3"
+        mp3 = os.path.join(OUT, f"voice{i + 1}.{ext}")
         asyncio.run(synthesize(NARRATION[i], mp3))
         seg_duration = duration_of(mp3) + TAIL_SILENCE
 
