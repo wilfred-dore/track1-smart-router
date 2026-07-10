@@ -156,6 +156,7 @@ def solve_ner(prompt):
     m = re.search(r"from\s*:\s*(.+)$", prompt, re.I | re.S)
     text = m.group(1) if m else (prompt.split(":", 1)[1] if ":" in prompt else prompt)
     entities, taken = _find_dates(text)
+    skipped = 0
 
     for m in re.finditer(r"\b[A-Z][\w''-]*(?:\s+[A-Z][\w''-]*)*", text):
         if any(m.start() < e and m.end() > s for s, e in taken):
@@ -177,14 +178,19 @@ def solve_ner(prompt):
         elif titled or len(tokens) >= 2:
             kind = "person"
         else:
-            continue  # unknown isolated token: too uncertain
+            skipped += 1  # unknown isolated token: too uncertain to label
+            continue
         entities.append((m.start(), span, kind))
 
     entities = sorted(set(entities))
     if not entities:
         return None
     answer = "; ".join(f"{span} - {kind}" for _, span, kind in entities)
-    return answer, (0.8 if len(entities) >= 2 else 0.4)
+    # A skipped span means a probable entity we could not classify: a partial
+    # entity list reads as confident-but-wrong to the judge, so drop confidence
+    # below the solver threshold and let the LLM path handle it.
+    confidence = 0.8 if len(entities) >= 2 and skipped == 0 else 0.4
+    return answer, confidence
 
 
 # ------------------------------------------------------------------ factual

@@ -79,7 +79,8 @@ class FireworksClient(_UsageTracker):
         super().__init__()
         from openai import OpenAI  # lazy import: not needed in mock mode
         self._client = OpenAI(base_url=os.environ["FIREWORKS_BASE_URL"],
-                              api_key=os.environ["FIREWORKS_API_KEY"])
+                              api_key=os.environ.get("FIREWORKS_API_KEY") or "not-provided",
+                              timeout=25.0)  # per-request rule is 30 s
 
     def chat(self, model, messages, max_tokens, stop=None, extra_params=None):
         resp = self._client.chat.completions.create(
@@ -98,7 +99,11 @@ class FireworksClient(_UsageTracker):
 def get_client(cfg):
     mode = os.environ.get("FIREWORKS_MODE", "auto").lower()
     if mode == "auto":
-        mode = "live" if os.environ.get("FIREWORKS_API_KEY") else "mock"
+        # Live as soon as the harness injected ANY Fireworks env: shipping mock
+        # answers at grading time would be catastrophic even if only the key
+        # is missing or renamed.
+        mode = ("live" if (os.environ.get("FIREWORKS_API_KEY")
+                           or os.environ.get("FIREWORKS_BASE_URL")) else "mock")
     if mode == "live":
         return FireworksClient()
     print("[fireworks] MOCK MODE: no network calls, simulated tokens", file=sys.stderr)

@@ -13,7 +13,11 @@ cache:
 
 solvers:
   enabled: true
-  use: [math, sentiment, ner, factual]   # remove a name to disable that solver
+  # QUALIFICATION PROFILE (post ACCURACY_GATE_FAILED @36.8%, July 10): only the
+  # exact-arithmetic solver stays; sentiment lexicon and NER gazetteers are too
+  # risky on unseen variants until the gate is passed. Descend the ladder
+  # (re-add: sentiment, ner, factual) one submission at a time AFTER a pass.
+  use: [math]
   min_confidence: 0.75   # below this, ignore the solver and fall through to the local LLM
 
 local:
@@ -63,12 +67,13 @@ gate:
 escalation:
   enabled: true          # escalate_enabled
   never: []              # categories never escalated
-  # Routing principle: escalate what cannot be verified for free. Math/logic
-  # (sweep 2026-07-10: 0 verified failures, 3x less CPU) and factual (the gate
-  # cannot check truthfulness; QasimKhan5d's public post-mortem measured their
-  # local factual at 3/9 on real TriviaQA-style variants after a self-authored
-  # benchmark had passed everything). Solvers still run first at 0 tokens.
-  always: [math, logic, factual]
+  # QUALIFICATION PROFILE: escalate everything (solver-answered tasks excepted).
+  # First priority is passing the 80% gate — est. ~2,800 tokens, still 35% under
+  # the current leader. After a posted pass, descend the ladder one submission
+  # at a time: restore local for summarization/code (verifiable), then
+  # sentiment/NER solvers, then enable escalation batching (measured 684 tk).
+  always: [math, logic, factual, sentiment, summarization, ner,
+           code_debugging, code_generation]
   system_prompt: "Answer directly and concisely in English. No preamble, do not restate the question."
   category_instructions:
     # Measured via Mammouth/kimi 2026-07-10: answer-only keeps 19/19 (kimi bills
@@ -81,16 +86,22 @@ escalation:
     code_generation: "Return only the code."
     logic: "Answer with only the correct name or label, using the exact wording from the question."
     factual: "Two sentences maximum."
-  max_tokens:            # tight output contract per category (Fireworks tokens)
-    default: 200
-    sentiment: 60
-    summarization: 100
-    ner: 150
-    factual: 120
-    math: 150
-    logic: 120
-    code_debugging: 350
-    code_generation: 350
+  # Caps are a safety guillotine, NOT a saving: billing counts tokens actually
+  # generated (my5757980's measured finding). Tight caps are CATASTROPHIC with
+  # thinking models: internal reasoning eats the budget before the visible
+  # answer -> empty content -> garbage fallback shipped (root cause of the
+  # 36.8% ACCURACY_GATE_FAILED on July 10: sentiment was capped at 60 while
+  # kimi thinks for 50-200 tokens).
+  max_tokens:
+    default: 600
+    sentiment: 500
+    summarization: 500
+    ner: 500
+    factual: 500
+    math: 500
+    logic: 500
+    code_debugging: 800
+    code_generation: 800
   batch:                 # group escalations into one call (yassai measured batching as
     enabled: false       # the dominant token lever). Single point of failure: parse
     max_tasks: 10        # failures fall back to per-task calls. Enable after a posted score.

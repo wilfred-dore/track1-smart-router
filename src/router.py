@@ -220,6 +220,11 @@ class Router:
             except Exception as e:
                 print(f"[router] escalation failed ({e}): falling back to local", file=sys.stderr)
 
+        # Escalation failed or disabled: NEVER ship an empty answer. For
+        # always-escalated categories no local attempt was made yet — a 3B
+        # guess scores far better than "Unable to answer." (guaranteed zero).
+        if not local_answer and not self._rushed:
+            local_answer = self.local.generate(prompt, category)
         rec["route"] = "local_lowconf" if local_answer else "fallback"
         return local_answer or "Unable to answer."
 
