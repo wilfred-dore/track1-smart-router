@@ -131,7 +131,21 @@ own default activation threshold (`threshold_tokens: 2000`). Compressing short
   fewer escalations; lighter than adding [outlines](https://github.com/dottxt-ai/outlines) or
   [guidance](https://github.com/guidance-ai/guidance) to the image.
 
-## 5. Remaining levers, ranked by expected value
+## 5. Scientific literature (sonar sweep, July 10)
+
+- **Batch prompting suppresses overthinking in reasoning models**: measured -74%
+  reasoning tokens for o1 at batch size 15 with accuracy within ±2.4pp — the
+  published explanation for our own measurement (3,510 → ~800 tokens when we
+  batched kimi escalations into one call).
+- **Batching interference**: ≤2pp accuracy cost for homogeneous, well-formatted
+  batches (up to b=100); **5-15pp degradation when mixing heterogeneous
+  reasoning problems** → we chunk reasoning-type and direct-type tasks into
+  separate batch calls.
+- **LLM-as-judge and bare answers**: no controlled measurement in the literature
+  showing a correctness-judging penalty for answer-only responses vs
+  answer+justification — our terse escalation contract is not contradicted.
+
+## 6. Remaining levers, ranked by expected value
 
 1. **Batch the ~7 escalations into 1-2 calls** — est. -300-400 tokens; medium risk (parsing, single point of failure).
 2. **`reasoning_effort=none` + tokenizer arbitrage measurement** — one cheap live experiment once credits arrive.

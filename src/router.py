@@ -101,12 +101,23 @@ class Router:
                 pending.append(rec)
             elif on_result:
                 on_result(rec)
-        for chunk_start in range(0, len(pending), int(bcfg.get("max_tasks") or 10)):
-            chunk = pending[chunk_start:chunk_start + int(bcfg.get("max_tasks") or 10)]
-            self._escalate_batch(chunk)
-            if on_result:
-                for rec in chunk:
-                    on_result(rec)
+        # Group reasoning-type tasks separately: mixing heterogeneous reasoning
+        # problems in one batch measurably degrades accuracy (5-15pp reported;
+        # arXiv batch-prompting interference studies), while homogeneous batches
+        # stay within ~2pp of per-task calls.
+        groups = {}
+        for rec in pending:
+            key = ("reasoning" if rec["category"] in
+                   ("math", "logic", "code_debugging", "code_generation") else "direct")
+            groups.setdefault(key, []).append(rec)
+        max_tasks = int(bcfg.get("max_tasks") or 10)
+        for group in groups.values():
+            for i in range(0, len(group), max_tasks):
+                chunk = group[i:i + max_tasks]
+                self._escalate_batch(chunk)
+                if on_result:
+                    for rec in chunk:
+                        on_result(rec)
         return results
 
     def _safe(self, fn, task):
