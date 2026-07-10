@@ -63,10 +63,12 @@ gate:
 escalation:
   enabled: true          # escalate_enabled
   never: []              # categories never escalated
-  # Calibration sweep 2026-07-10: the local 3B is unreliable on math/logic and the
-  # zero-cost gate cannot verify correctness there; escalating them outright gave
-  # 0 verified failures for ~900 estimated tokens (leader: 4,268) and 3x less CPU.
-  always: [math, logic]  # escalated outright (bypass local; solvers still run first)
+  # Routing principle: escalate what cannot be verified for free. Math/logic
+  # (sweep 2026-07-10: 0 verified failures, 3x less CPU) and factual (the gate
+  # cannot check truthfulness; QasimKhan5d's public post-mortem measured their
+  # local factual at 3/9 on real TriviaQA-style variants after a self-authored
+  # benchmark had passed everything). Solvers still run first at 0 tokens.
+  always: [math, logic, factual]
   system_prompt: "Answer directly and concisely in English. No preamble, do not restate the question."
   category_instructions:
     math: "Give the final numeric answer with at most two short lines of working."

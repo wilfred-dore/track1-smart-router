@@ -32,6 +32,17 @@ def main():
         return 1
 
     router = Router(cfg, LocalLLM(cfg), get_client(cfg))
+
+    def write_results(results):
+        # Rewritten atomically after every task so /output/results.json is valid
+        # at any kill point — a hard timeout no longer scores zero
+        # (pattern credit: Kunsh162007/Hybrid-token-efficient-routing-agent).
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        tmp_path = output_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=1)
+        os.replace(tmp_path, output_path)
+
     results = []
     for task in tasks:
         try:
@@ -41,14 +52,9 @@ def main():
             rec = {"task_id": task.get("task_id"), "answer": "Unable to answer.",
                    "route": "error", "tokens": 0}
         results.append({"task_id": rec["task_id"], "answer": rec["answer"]})
+        write_results(results)
         print(f"[main] {rec['task_id']}: route={rec.get('route')} "
               f"tokens={rec.get('tokens', 0)}", file=sys.stderr)
-
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    tmp_path = output_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=1)
-    os.replace(tmp_path, output_path)
 
     usage = router.fw.usage_summary()
     print(f"[main] {len(results)} answers written to {output_path} "
