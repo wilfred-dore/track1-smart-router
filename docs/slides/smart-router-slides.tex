@@ -14,7 +14,7 @@
 \title{Smart Router}
 \subtitle{Track 1 --- General-Purpose AI Agent}
 \author{Wilfred Dor\'e}
-\institute{AMD Developer Hackathon --- ACT II}
+\institute{AMD Developer Hackathon --- ACT II \\ Team Robot ROCm}
 \date{July 2026}
 
 \begin{document}
@@ -22,7 +22,7 @@
 \begin{frame}
   \titlepage
   \begin{center}
-    \texttt{ghcr.io/wilfred-dore/track1-smart-router:latest}
+    \texttt{ghcr.io/wilfred-dore/track1-smart-router:v20}
   \end{center}
 \end{frame}
 
@@ -38,9 +38,9 @@
     \column{0.4\textwidth}
       \textbf{Consequences for design}
       \begin{itemize}
-        \item Local inference = 0 tokens $\Rightarrow$ use it aggressively
+        \item Local inference $=$ 0 tokens $\Rightarrow$ use it aggressively
         \item Every escalation must be \emph{deliberate}
-        \item Extra accuracy above the gate is wasted tokens
+        \item Route by \textbf{verifiability}, not difficulty
       \end{itemize}
   \end{columns}
   \vspace{0.4cm}
@@ -57,10 +57,10 @@
     cost/.style={font=\scriptsize\bfseries},
     arrow/.style={-{Stealth[length=2mm]}, thick, black!60}
   ]
-    \node[stage] (s1) {\textbf{1. Deterministic solvers} --- arithmetic parser, sentiment lexicon, NER gazetteers, capital lookup};
-    \node[stage, below=of s1] (s2) {\textbf{2. Local LLM} --- Qwen2.5-3B, 4-bit GGUF, llama.cpp, CPU-only, bundled in the image};
-    \node[stage, below=of s2] (s3) {\textbf{3. Confidence gate} --- per-category heuristics; unreliable categories (math, logic) skip straight to 4};
-    \node[stage, below=of s3] (s4) {\textbf{4. Fireworks escalation} --- model resolved from \texttt{ALLOWED\_MODELS} at runtime, tight per-category output contract};
+    \node[stage] (s1) {\textbf{1. Deterministic solvers} --- exact arithmetic parser, negation-aware sentiment lexicon, spaCy statistical NER with rule overrides; each self-demotes on doubt};
+    \node[stage, below=of s1] (s2) {\textbf{2. Local LLM} --- Qwen2.5-3B, 4-bit GGUF, llama.cpp, CPU-only, bundled: summarization and code generation, verified for free (sentence counts, \texttt{ast.parse})};
+    \node[stage, below=of s2] (s3) {\textbf{3. Zero-cost gate} --- what cannot be \emph{verified} for free escalates: math, logic, factual, code debugging};
+    \node[stage, below=of s3] (s4) {\textbf{4. Fireworks escalation} --- model from \texttt{ALLOWED\_MODELS}; \texttt{reasoning\_effort=none}; logic solo (deterministic), the rest in two type-grouped batched calls};
     \node[cost, right=2mm of s1, okgreen] {0 tokens};
     \node[cost, right=2mm of s2, okgreen] {0 tokens};
     \node[cost, right=2mm of s3, okgreen] {0 tokens};
@@ -71,47 +71,50 @@
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{Engineering for the grading environment}
+\begin{frame}{Measured, not assumed: the descent from 6{,}559 to 639 tokens}
+  \centering
+  \begin{tabular}{llrl}
+    \toprule
+    \textbf{Step} & \textbf{Change} & \textbf{Tokens} & \textbf{Accuracy} \\
+    \midrule
+    v11 & everything escalated, 18 calls & 6{,}559 & 94.7\% (scored) \\
+    +batch & escalations grouped: one thinking session & 3{,}510 & 19/19 local eval \\
+    +local & summarization \& code answered on-device & 2{,}758 & 19/19 \\
+    +\texttt{reasoning\_effort=none} & billed thinking switched off & 548 & 19/19 \\
+    +prompt trim, +solo logic & final profile (v20) & \textbf{639--649} & \textbf{19/19 $\times$4 runs} \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.4cm}
   \begin{itemize}
-    \item \textbf{Everything config-driven} --- gate thresholds, category$\to$model mapping, token budgets, escalation policy. No hardcoded answers, no caching across runs.
-    \item \textbf{Reasoning-model safety} --- inline \texttt{<think>} blocks stripped; if thinking consumes the whole token budget, the answer is recovered from the reasoning field instead of returning empty.
-    \item \textbf{Graceful degradation} --- a broken local runtime falls back to full escalation; the container never crashes, every \texttt{task\_id} always gets an answer.
-    \item \textbf{Mock mode} --- the full pipeline runs and counts tokens without any API key; \texttt{auto} mode switches to live when the harness injects credentials.
-    \item \textbf{Calibrated by sweep, not by hand} --- routing policies compared on a 19-task local eval (8 official practice tasks + 11 self-authored variants).
+    \item Every step measured on the \textbf{real Fireworks API} with the real \texttt{kimi-k2p7-code}
+    \item Batching suppresses billed reasoning ($-74\%$ measured in the literature; we observed the same)
+    \item Batched logic without thinking is nondeterministically wrong $\rightarrow$ logic runs solo, $\sim$6 tokens per task
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Results --- measured in CI under the exact grading limits}
-  \centering
-  \begin{tabular}{lll}
-    \toprule
-    \textbf{Metric} & \textbf{Measured} & \textbf{Constraint} \\
-    \midrule
-    Runtime, 19 tasks (4 GB RAM, 2 vCPU, amd64) & 90 s & 600 s \\
-    Compressed image size & 1.97 GB & 10 GB \\
-    Estimated Fireworks tokens / full run & $\sim$900 & leader: 4{,}268 \\
-    Local eval accuracy (escalations assumed) & 19/19 & gate: 16/19 \\
-    Output schema \& exit code & valid & required \\
-    \bottomrule
-  \end{tabular}
-  \vspace{0.5cm}
+\begin{frame}{Validated three ways before ever resubmitting}
   \begin{itemize}
-    \item CI pipeline: native amd64 build $\to$ smoke test at grading limits $\to$ size check $\to$ publish
-    \item The smoke test already caught one real bug (musl-linked wheel) before any submission slot was spent
+    \item \textbf{Real-API evaluation}: 19 practice-style fixtures, 19/19 on four consecutive runs, 639--649 tokens (near-deterministic)
+    \item \textbf{Generalization gauntlet}: 19 fresh adversarial tasks written to break the pipeline --- caught a sentiment-lexicon trap, a semantic code-debug miss and NER label errors; all fixed, 18/19 (the last miss is genuinely ambiguous)
+    \item \textbf{Independent LLM-judge simulation}: a different model family graded all 38 answers the way the official judge would --- caught nonsense justifications a regex checker cannot see
+    \item \textbf{CI replays the grading environment exactly} (linux/amd64, 4\,GB RAM, 2 vCPU): 19 tasks in 90\,s, 1.97\,GB compressed image, schema and size gates before any publish
+    \item Everything config-driven; no hardcoded answers, no caching across runs; the only runtime network call is \texttt{FIREWORKS\_BASE\_URL}
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Takeaways}
   \begin{itemize}
-    \item \textbf{Zero-cost first}: solvers + a bundled 3B handle most of the load; the paid API sees only the hard residue
-    \item \textbf{Route by reliability, not by difficulty}: categories where a small model fails \emph{silently} (math, logic, multi-part factual) escalate outright
-    \item \textbf{Plumbing wins hackathons}: most failed submissions break on infrastructure --- CI reproduces the grading environment exactly
+    \item \textbf{Zero-cost first}: solvers + a bundled 3B absorb everything that can be verified for free; the paid API sees only the hard residue
+    \item \textbf{Route by reliability, not difficulty}: categories where small models fail \emph{silently} escalate outright
+    \item \textbf{Measure everything}: stand-in proxies before credits, real-API sweeps after, an adversarial gauntlet and a simulated judge before each freeze
+    \item \textbf{Plumbing wins hackathons}: most failed submissions break on infrastructure --- ours is CI-proven against the exact grading limits
   \end{itemize}
-  \vspace{0.6cm}
+  \vspace{0.5cm}
   \centering
   \structure{\textbf{Submission}}\\[2mm]
-  \texttt{ghcr.io/wilfred-dore/track1-smart-router:latest}\\[1mm]
-  \small public $\cdot$ linux/amd64 $\cdot$ weights bundled $\cdot$ no secrets inside
+  \texttt{ghcr.io/wilfred-dore/track1-smart-router:v20}\\[1mm]
+  \small public $\cdot$ linux/amd64 $\cdot$ weights bundled $\cdot$ no secrets inside \\[1mm]
+  \scriptsize Techniques adapted from publicly shared competitor write-ups and the literature are credited in the repository.
 \end{frame}
 
 \end{document}
