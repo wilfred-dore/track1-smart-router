@@ -1,4 +1,21 @@
-# STATUS — July 10, 2026 (deadline: July 11, 6pm CET)
+# STATUS — July 11, 2026 (deadline EXTENDED: July 12, 3pm PT)
+
+## FINAL SUBMISSION: v20 — freeze
+Measured on the real Fireworks API (kimi-k2p7-code):
+- 19 fixtures: 19/19 x4 runs, 639-649 tokens (4 calls: 2 solo logic + 2 batches)
+- Generalization gauntlet (19 fresh adversarial tasks): 18/19 (last miss genuinely ambiguous)
+- Independent LLM-judge simulation over all 38 answers: 35/38 -> fixes applied -> clean
+- Leader at freeze time: 1,377 tokens @ 89.5%
+Profile: solvers (math/sentiment/spaCy-NER) -> local Qwen2.5-3B (summarization,
+code_generation; sentence-count + ast.parse gates) -> kimi escalation with
+reasoning_effort=none (logic SOLO per-task - batched logic without thinking is
+non-deterministically wrong; math/code_debugging and factual/direct in 2 grouped
+batches), truncation guard, cascade fallbacks. Final scoring uses REFRESHED
+prompts after close - this profile was hardened for exactly that.
+Known issue: our leaderboard queue entry stuck since Jul 10 13:08 (zero evaluator
+pulls since, proven by registry counters); escalation via ticket/general/email.
+Rollback safety: v11 (scored 94.7% @ 6,559).
+
 
 ## Submission ladder log (tags are instant rollbacks)
 - v11 all-escalated: **scored 94.7% @ 6,559 tk** (rank ~17-20 at the time)
