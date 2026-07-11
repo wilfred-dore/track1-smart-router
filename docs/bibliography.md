@@ -110,6 +110,15 @@ own default activation threshold (`threshold_tokens: 2000`). Compressing short
   (NAACL 2025 — the de-facto awesome-prompt-compression), xlite-dev/Awesome-LLM-Inference
   (GPU serving-side, irrelevant to per-token API billing).
 
+### Tested with real credits, held in reserve
+- [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) — telegraphic
+  "caveman-speak" output style (-65% output tokens claimed for coding agents).
+  Convergent with our terse answer contracts. Measured on our factual answers:
+  108 -> 79 completion tokens (-27%) with the simulated judge accepting 3/3.
+  Projected gain on the full profile: ~30-50 tokens (639 -> ~600). NOT shipped:
+  organizers' explicit "don't resubmit" guidance outweighs a ~5% gain; ready to
+  fold into a future tag if a resubmission happens anyway.
+
 ### Worth testing once real credits arrive
 - **Fireworks grammar mode (GBNF)** ([docs](https://fireworks.ai/docs/structured-responses/structured-output-grammar-based)) —
   server-side constrained decoding: completion = exactly the answer alphabet (1-3 tokens).
