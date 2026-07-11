@@ -22,7 +22,7 @@ local:
     math: Compute step by step briefly, then give the final numeric answer on the
       last line.
     summarization: Respect the requested length exactly (one sentence means exactly
-      ONE sentence).
+      ONE sentence). Cover the main point AND any contrasting caveat from the source.
     sentiment: Give the sentiment label (positive / negative / mixed / neutral) and
       one short justification.
     ner: List each entity with its type (person, organization, location, date).
