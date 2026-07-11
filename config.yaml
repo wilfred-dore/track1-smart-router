@@ -114,10 +114,13 @@ escalation:
     timeout_seconds: 90  # a grouped call takes longer than a single-task one
   max_prompt_chars: 6000 # truncate abnormally long prompts before sending
   stop: []
-  extra_params: {}       # passed verbatim to the chat API (extra_body). Candidate once
-                         # real credits arrive: {reasoning_effort: none} — measured by
-                         # omerdduran/token-router: minimax-m3 16/19 with it, but
-                         # gemma-4 returns EMPTY content under it. Test before enabling.
+  # Measured on the REAL Fireworks API (July 11): reasoning_effort=none cuts
+  # kimi's billed thinking entirely (58 -> 2 completion tokens on a math task)
+  # with NO accuracy loss: full eval 19/19 @ 548-549 tokens, twice, vs 1,345
+  # with thinking on. token-router's leaderboard data proves the grading proxy
+  # forwards this param. Caveat kept in mind: gemma-4 returns EMPTY under it,
+  # but we never route gemma (kimi first, minimax fallback measured 16/19).
+  extra_params: {reasoning_effort: none}
   model_preference:      # substrings matched against ALLOWED_MODELS (env) at runtime
     # Calibrated 2026-07-10 via Mammouth on the real model families:
     # kimi-k2.7-code 19/19 @ 1,059 tk vs minimax-m3 18/19 @ 1,622 tk
