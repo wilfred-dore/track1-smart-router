@@ -113,11 +113,14 @@ own default activation threshold (`threshold_tokens: 2000`). Compressing short
 ### Tested with real credits, held in reserve
 - [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) — telegraphic
   "caveman-speak" output style (-65% output tokens claimed for coding agents).
-  Convergent with our terse answer contracts. Measured on our factual answers:
-  108 -> 79 completion tokens (-27%) with the simulated judge accepting 3/3.
-  Projected gain on the full profile: ~30-50 tokens (639 -> ~600). NOT shipped:
-  organizers' explicit "don't resubmit" guidance outweighs a ~5% gain; ready to
-  fold into a future tag if a resubmission happens anyway.
+  Convergent with our terse answer contracts. Isolated factual answers: 108 -> 79
+  completion tokens (-27%), judge-approved. BUT the full-profile A/B (38 tasks,
+  real API, simulated judge) measured NO gain: 1,229 vs 1,204 tokens — the batch
+  already compresses answers to the floor and the telegraphic instructions cost
+  their own prompt tokens. NOT shipped; a clean negative result. Bonus finding
+  from the A/B: judge models disagree with each other on debatable entity labels
+  (Sorbonne: location vs organization — 2/3 judges accept ours), confirming the
+  freeze decision over chasing any single judge's opinion.
 
 ### Worth testing once real credits arrive
 - **Fireworks grammar mode (GBNF)** ([docs](https://fireworks.ai/docs/structured-responses/structured-output-grammar-based)) —
