@@ -79,10 +79,13 @@ def _sentiment_hits(text):
     pos, neg = set(), set()
     for i, w in enumerate(words):
         negated = any(p in _NEGATIONS for p in words[max(0, i - 2):i])
+        # Cite flipped cues WITH their negation: a justification listing 'bad'
+        # as a positive cue reads as nonsense to the judge ('not bad' does not).
+        shown = f"not {w}" if negated else w
         if any(w.startswith(root) for root in _POS):
-            (neg if negated else pos).add(w)
+            (neg if negated else pos).add(shown)
         elif any(w.startswith(root) for root in _NEG):
-            (pos if negated else neg).add(w)
+            (pos if negated else neg).add(shown)
     for m in re.findall(r"\btoo\s+(\w+)", text.lower()):  # "too easily", "too slow"...
         neg.add(f"too {m}")
     return pos, neg
@@ -157,9 +160,13 @@ def solve_ner_spacy(prompt):
                 ent.text.lower()):
             continue  # adjective-only DATE spans ('annual') are false positives
         # Rule signals beat the statistical label: an 'AI'/'Inc' suffix is an
-        # organization even when spaCy tags the span GPE (e.g. 'Fireworks AI').
+        # organization even when spaCy tags the span GPE (e.g. 'Fireworks AI'),
+        # and a gazetteer city is a location even when spaCy tags it ORG
+        # (judge-sim caught 'Reykjavik - organization').
         if ent.text.split()[-1].lower() in _ORG_SUFFIXES or ent.text.endswith("AI"):
             kind = "organization"
+        elif ent.text.lower() in _LOCATIONS:
+            kind = "location"
         entities.append((ent.start_char, ent.text, kind))
         covered.append((ent.start_char, ent.end_char))
     if not entities:
@@ -189,7 +196,11 @@ _LOCATIONS = {
     "milan", "moscow", "istanbul", "cairo", "nairobi", "lagos", "johannesburg",
     "tokyo", "osaka", "seoul", "beijing", "shanghai", "shenzhen", "singapore",
     "mumbai", "delhi", "bangalore", "dubai", "sydney", "melbourne", "canberra",
-    "auckland", "new york", "san francisco", "los angeles", "seattle", "austin",
+    "auckland", "reykjavik", "basel", "stockholm", "oslo", "copenhagen", "helsinki",
+    "athens", "budapest", "bucharest", "kyiv", "edinburgh", "manchester", "lyon",
+    "marseille", "hamburg", "frankfurt", "rotterdam", "porto", "valencia", "seville",
+    "krakow", "riga", "vilnius", "tallinn", "ljubljana", "zagreb", "belgrade",
+    "new york", "san francisco", "los angeles", "seattle", "austin",
     "boston", "chicago", "toronto", "vancouver", "montreal", "mexico city",
     "france", "germany", "spain", "italy", "portugal", "netherlands", "belgium",
     "switzerland", "austria", "poland", "ireland", "united kingdom", "uk",
