@@ -174,10 +174,8 @@ class Router:
         instructions = ecfg.get("category_instructions") or {}
         categories = sorted({r["category"] for r in chunk})
         guidance = " ".join(f"[{c}] {instructions[c]}" for c in categories if c in instructions)
-        system = (ecfg["system_prompt"] + " You will receive several independent tasks, "
-                  "each tagged with an id and category. Answer each one independently. "
-                  'Return ONLY a JSON object mapping each id (exactly as given in '
-                  'brackets) to its answer string, like {"id-1": "answer", ...}. '
+        system = (ecfg["system_prompt"] + ' Independent tasks tagged [id] (category). '
+                  'Return ONLY JSON: {"id": "answer", ...} with ids exactly as given. '
                   + guidance)
         user = "\n\n".join(f"[{r['task_id']}] ({r['category']}) "
                            f"{r['prompt'][:ecfg['max_prompt_chars']]}" for r in chunk)

@@ -1,43 +1,35 @@
-# =====================================================================
-# Track 1 — Smart Router. EVERYTHING is configurable here, nothing hardcoded.
-# Env overrides: LOCAL_MODEL_PATH, INPUT_PATH, OUTPUT_PATH,
-#                CONFIG_PATH, FIREWORKS_MODE (mock|live|auto)
-# =====================================================================
-
 io:
-  input_path: /input/tasks.json      # Participant Guide format
+  input_path: /input/tasks.json
   output_path: /output/results.json
-
 cache:
-  enabled: true          # intra-run cache (identical normalized prompts). Never persisted across runs.
-
+  enabled: true
 solvers:
   enabled: true
-  # QUALIFICATION PROFILE (post ACCURACY_GATE_FAILED @36.8%, July 10): only the
-  # exact-arithmetic solver stays; sentiment lexicon and NER gazetteers are too
-  # risky on unseen variants until the gate is passed. Descend the ladder
-  # (re-add: sentiment, ner, factual) one submission at a time AFTER a pass.
-  use: [math, sentiment, ner]
-  min_confidence: 0.75   # below this, ignore the solver and fall through to the local LLM
-  ner_backend: spacy     # statistical NER (en_core_web_sm) with rule-signal label fixes;
-                         # self-demotes when a capitalized token stays unlabeled.
-                         # 'rules' = gazetteer-only fallback (also used if spaCy is missing)
-
+  use:
+  - math
+  - sentiment
+  - ner
+  min_confidence: 0.75
+  ner_backend: spacy
 local:
-  model_path: models/model.gguf     # override: LOCAL_MODEL_PATH (=/models/model.gguf in the image)
-  n_ctx: 4096   # hidden summarization passages can be long
-  n_threads: 0                      # 0 = auto (os.cpu_count())
+  model_path: models/model.gguf
+  n_ctx: 4096
+  n_threads: 0
   temperature: 0.1
-  system_prompt: "You are a precise assistant. Answer in English, directly and concisely. No preamble."
+  system_prompt: You are a precise assistant. Answer in English, directly and concisely.
+    No preamble.
   category_hints:
-    math: "Compute step by step briefly, then give the final numeric answer on the last line."
-    summarization: "Respect the requested length exactly (one sentence means exactly ONE sentence)."
-    sentiment: "Give the sentiment label (positive / negative / mixed / neutral) and one short justification."
-    ner: "List each entity with its type (person, organization, location, date)."
-    code_debugging: "State the bug in one line, then give the corrected code."
-    code_generation: "Return only the code with minimal comments."
-    logic: "State the final answer first, then one line of justification."
-    factual: "Answer in one or two sentences."
+    math: Compute step by step briefly, then give the final numeric answer on the
+      last line.
+    summarization: Respect the requested length exactly (one sentence means exactly
+      ONE sentence).
+    sentiment: Give the sentiment label (positive / negative / mixed / neutral) and
+      one short justification.
+    ner: List each entity with its type (person, organization, location, date).
+    code_debugging: State the bug in one line, then give the corrected code.
+    code_generation: Return only the code with minimal comments.
+    logic: State the final answer first, then one line of justification.
+    factual: Answer in one or two sentences.
   max_tokens:
     default: 160
     sentiment: 80
@@ -48,10 +40,9 @@ local:
     logic: 180
     code_debugging: 300
     code_generation: 300
-
 gate:
   enabled: true
-  thresholds:            # minimum confidence to KEEP the local answer (otherwise escalate)
+  thresholds:
     default: 0.6
     sentiment: 0.45
     summarization: 0.45
@@ -61,43 +52,30 @@ gate:
     logic: 0.8
     code_debugging: 0.7
     code_generation: 0.7
-  self_consistency:      # local resampling (0 Fireworks tokens, costs CPU time)
-    enabled: false       # n=2 proved flaky (agrees on wrong answers); moot while
-    categories: [math, logic]   # math/logic are in escalation.always below
-    samples: 2           # total number of samples (2 = 1 resample)
+  self_consistency:
+    enabled: false
+    categories:
+    - math
+    - logic
+    samples: 2
     temperature: 0.7
-
 escalation:
-  enabled: true          # escalate_enabled
-  never: []              # categories never escalated
-  # QUALIFICATION PROFILE: escalate everything (solver-answered tasks excepted).
-  # First priority is passing the 80% gate — est. ~2,800 tokens, still 35% under
-  # the current leader. After a posted pass, descend the ladder one submission
-  # at a time: restore local for summarization/code (verifiable), then
-  # sentiment/NER solvers, then enable escalation batching (measured 684 tk).
-  # RUNG 2 (after passing the gate at 94.7% all-escalated): verifiable
-  # categories return to the local 3B — summarization (sentence-count check;
-  # long source passages never reach the paid API) and code (ast.parse gate).
-  # Unverifiable ones stay escalated.
-  always: [math, logic, factual]
-  system_prompt: "Answer directly and concisely in English. No preamble, do not restate the question."
+  enabled: true
+  never: []
+  always:
+  - math
+  - logic
+  - factual
+  system_prompt: Answer concisely in English.
   category_instructions:
-    # Measured via Mammouth/kimi 2026-07-10: answer-only keeps 19/19 (kimi bills
-    # its internal thinking anyway, visible working is redundant) and saves 15%.
-    math: "Give only the final numeric answer."
-    sentiment: "Give the label and one short justification."
-    summarization: "Respect the requested length exactly."
-    ner: "List entities as 'text - type' only."
-    code_debugging: "State the bug in one line, then the corrected code only."
-    code_generation: "Return only the code."
-    logic: "Answer with only the correct name or label, using the exact wording from the question."
-    factual: "Two sentences maximum."
-  # Caps are a safety guillotine, NOT a saving: billing counts tokens actually
-  # generated (my5757980's measured finding). Tight caps are CATASTROPHIC with
-  # thinking models: internal reasoning eats the budget before the visible
-  # answer -> empty content -> garbage fallback shipped (root cause of the
-  # 36.8% ACCURACY_GATE_FAILED on July 10: sentiment was capped at 60 while
-  # kimi thinks for 50-200 tokens).
+    code_debugging: Bug in one line, then corrected code only.
+    code_generation: Code only.
+    factual: At most two sentences.
+    logic: Only the name or label, exact wording from the question.
+    math: Final numeric answer only.
+    ner: List entities as 'text - type' only.
+    sentiment: Label plus one short justification.
+    summarization: Respect the requested length exactly.
   max_tokens:
     default: 600
     sentiment: 500
@@ -108,32 +86,26 @@ escalation:
     logic: 500
     code_debugging: 800
     code_generation: 800
-  batch:                 # RUNG 1 of the descent (gate passed 94.7% on July 10): one
-    enabled: true        # thinking session + one system prompt instead of 18. Parse
-    max_tasks: 10        # failures fall back to per-task calls (validated in mock).
-    timeout_seconds: 90  # a grouped call takes longer than a single-task one
-  max_prompt_chars: 6000 # truncate abnormally long prompts before sending
+  batch:
+    enabled: true
+    max_tasks: 10
+    timeout_seconds: 90
+  max_prompt_chars: 6000
   stop: []
-  # Measured on the REAL Fireworks API (July 11): reasoning_effort=none cuts
-  # kimi's billed thinking entirely (58 -> 2 completion tokens on a math task)
-  # with NO accuracy loss: full eval 19/19 @ 548-549 tokens, twice, vs 1,345
-  # with thinking on. token-router's leaderboard data proves the grading proxy
-  # forwards this param. Caveat kept in mind: gemma-4 returns EMPTY under it,
-  # but we never route gemma (kimi first, minimax fallback measured 16/19).
-  extra_params: {reasoning_effort: none}
-  model_preference:      # substrings matched against ALLOWED_MODELS (env) at runtime
-    # Calibrated 2026-07-10 via Mammouth on the real model families:
-    # kimi-k2.7-code 19/19 @ 1,059 tk vs minimax-m3 18/19 @ 1,622 tk
-    # (minimax reasoning overflowed into answers despite extract_text fallback)
-    default: [kimi, minimax]
-    code_debugging: [kimi, minimax]
-    code_generation: [kimi, minimax]
-
+  extra_params:
+    reasoning_effort: none
+  model_preference:
+    default:
+    - kimi
+    - minimax
+    code_debugging:
+    - kimi
+    - minimax
+    code_generation:
+    - kimi
+    - minimax
 mock:
-  completion_ratio: 0.6  # simulated output tokens = ratio * max_tokens (conservative estimate)
-
+  completion_ratio: 0.6
 limits:
-  per_task_seconds: 25        # beyond this: warning in the logs only
-  total_budget_seconds: 480   # soft deadline (grading limit: 600 s). Past it, the router
-                              # skips slow local inference and goes solver/escalation only,
-                              # so the run always finishes with a complete results.json.
+  per_task_seconds: 25
+  total_budget_seconds: 480
