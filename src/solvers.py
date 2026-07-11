@@ -92,9 +92,19 @@ def solve_sentiment(prompt):
     text = prompt.split(":", 1)[1] if ":" in prompt else prompt
     if len(text.split()) < 3:
         return None
+    low = text.lower()
     pos, neg = _sentiment_hits(text)
+    # Counterfactual praise ("wanted to love it") is not praise.
+    if re.search(r"\b(wanted to|hoped to|tried to|expected to)\s+(love|like|enjoy)", low):
+        pos = {w for w in pos if w not in ("love", "like", "enjoy", "loved", "liked")}
     if not pos and not neg:
         return None
+    # A contrast marker with cues on only ONE side means the lexicon missed the
+    # other half of the nuance (gauntlet lesson): defer to the LLM path.
+    if re.search(r"\b(but|yet|however|although|though)\b", low) and (not pos or not neg):
+        confidence = 0.5
+    else:
+        confidence = 0.85
     if pos and neg:
         label = "mixed"
         why = (f"positive cues ({', '.join(sorted(pos))}) and "
@@ -103,7 +113,7 @@ def solve_sentiment(prompt):
         label, why = "positive", f"positive cues: {', '.join(sorted(pos))}"
     else:
         label, why = "negative", f"negative cues: {', '.join(sorted(neg))}"
-    return f"Sentiment: {label}. The review contains {why}.", 0.85
+    return f"Sentiment: {label}. The review contains {why}.", confidence
 
 
 # ---------------------------------------------------------------------- ner

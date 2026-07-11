@@ -18,7 +18,7 @@ CATEGORIES = ["factual", "math", "sentiment", "summarization", "ner",
 
 _MATH_KW = ("how many", "how much", "calculate", "compute", "percent", "%", "total",
             "sum of", "average", "speed", "per hour", "remain", "cost", "price",
-            "profit", "interest", "km", "miles")
+            "profit", "interest", "km", "miles", "how old", "times as", "add up to")
 _LOGIC_KW = ("who owns", "each own", "who won", "who is the", "logic", "puzzle",
              "deduce", "must be true", "exactly one", "neither", "either",
              "different position", "different pet", "each have", "each has")
@@ -105,16 +105,30 @@ class Router:
         # problems in one batch measurably degrades accuracy (5-15pp reported;
         # arXiv batch-prompting interference studies), while homogeneous batches
         # stay within ~2pp of per-task calls.
+        # Solo categories bypass batching entirely: batched logic without a
+        # thinking channel is non-deterministically wrong (measured), while the
+        # same tasks solo are deterministic and ~6 tokens each.
+        solo = set((bcfg.get("solo_categories") or []))
+        for rec in [p for p in pending if p["category"] in solo]:
+            pending.remove(rec)
+            try:
+                rec["answer"] = self._escalate(rec["prompt"], rec["category"], rec)
+            except Exception as e:
+                print(f"[router] solo escalation failed ({e})", file=sys.stderr)
+                rec.update(route="fallback",
+                           answer=rec.get("local_answer") or "Unable to answer.")
+            if on_result:
+                on_result(rec)
         groups = {}
         for rec in pending:
             key = ("reasoning" if rec["category"] in
                    ("math", "logic", "code_debugging", "code_generation") else "direct")
             groups.setdefault(key, []).append(rec)
         max_tasks = int(bcfg.get("max_tasks") or 10)
-        for group in groups.values():
+        for key, group in groups.items():
             for i in range(0, len(group), max_tasks):
                 chunk = group[i:i + max_tasks]
-                self._escalate_batch(chunk)
+                self._escalate_batch(chunk, group_kind=key)
                 if on_result:
                     for rec in chunk:
                         on_result(rec)
@@ -168,9 +182,14 @@ class Router:
                 answers.setdefault(tid, seg)
         return answers
 
-    def _escalate_batch(self, chunk):
-        """One Fireworks call for several tasks; per-task fallback on any miss."""
+    def _escalate_batch(self, chunk, group_kind="direct"):
+        """One Fireworks call for several tasks; per-task fallback on any miss.
+        Reasoning-type groups may use different extra_params: killing the
+        thinking channel makes logic answers non-deterministically wrong
+        (measured: 3 correct runs, then 'Lee' instead of 'Sam')."""
         ecfg = self.cfg["escalation"]
+        extra = (ecfg.get("extra_params_reasoning") if group_kind == "reasoning"
+                 else ecfg.get("extra_params")) or None
         instructions = ecfg.get("category_instructions") or {}
         categories = sorted({r["category"] for r in chunk})
         guidance = " ".join(f"[{c}] {instructions[c]}" for c in categories if c in instructions)
@@ -188,7 +207,7 @@ class Router:
                           {"role": "user", "content": user}],
                 max_tokens=min(budget, 4000),
                 stop=ecfg.get("stop") or None,
-                extra_params=ecfg.get("extra_params") or None,
+                extra_params=extra,
                 # A grouped call legitimately takes longer than a single one;
                 # the 25 s default was killing every batch on slow upstreams.
                 timeout=(ecfg.get("batch") or {}).get("timeout_seconds") or 90)

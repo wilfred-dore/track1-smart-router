@@ -66,6 +66,7 @@ escalation:
   - math
   - logic
   - factual
+  - code_debugging
   system_prompt: Answer concisely in English.
   category_instructions:
     code_debugging: Bug in one line, then corrected code only.
@@ -90,9 +91,13 @@ escalation:
     enabled: true
     max_tasks: 10
     timeout_seconds: 90
+    solo_categories:
+    - logic
   max_prompt_chars: 6000
   stop: []
   extra_params:
+    reasoning_effort: none
+  extra_params_reasoning:
     reasoning_effort: none
   model_preference:
     default:
