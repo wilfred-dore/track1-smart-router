@@ -1,6 +1,20 @@
 # STATUS — July 12, 2026 (deadline: today, 3pm PT / ~00:03 CEST Jul 13)
 
-## CURRENT: v24 — proven per-task skeleton + local rung + cross-model-audit hardening
+## POST-MORTEM v24: their eval scored it 36.8% (checked 12:37) — v23 restored (12:58)
+Triple-validated profile (19/19 x3 real API, gauntlet 18/19, judge-sim 9/9) still
+collapsed in THEIR environment. Fourth data point of the same law: every profile
+less defensive than v23 collapses there (v20 21.1%, v20-retry 21.1%, v24 36.8%)
+while v11/v23 scores 94.7% on every pass. Prime suspect for v24 specifically:
+`max_retries=0` — the SDK's 2 silent retries were exactly what absorbed their
+proxy's flakiness in v23's per-task calls; cutting them turned slow-proxy blips
+into failed escalations answered by the local 3B (~7/19 signature). Second
+suspect: sentiment/NER solvers on their hidden variants. Not distinguishable
+from outside; not worth another submission cycle to find out.
+DECISION: v23 restored and FROZEN. No further optimization submissions. The
+passive rank lever remains: final re-scoring on refreshed prompts, where robust
+94.7% survives and overfit 0-token entries are designed to fall.
+
+## Superseded: v24 — proven per-task skeleton + local rung + cross-model-audit hardening
 v23 (safety profile) scored 94.7% @ 6,424 at their eval (Jul 12, 10:52) — rank 44.
 v24 = the SAME proven per-task skeleton (thinking on, no exotic params, generous
 caps) + full solver tier (math / sentiment / spaCy NER) + local answering for
