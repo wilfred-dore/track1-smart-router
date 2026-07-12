@@ -1,6 +1,23 @@
-# STATUS — July 11, 2026 (deadline EXTENDED: July 12, 3pm PT)
+# STATUS — July 12, 2026 (deadline: today, 3pm PT / ~00:03 CEST Jul 13)
 
-## FINAL SUBMISSION: v20 — freeze
+## CURRENT: v24 — proven per-task skeleton + local rung + cross-model-audit hardening
+v23 (safety profile) scored 94.7% @ 6,424 at their eval (Jul 12, 10:52) — rank 44.
+v24 = the SAME proven per-task skeleton (thinking on, no exotic params, generous
+caps) + full solver tier (math / sentiment / spaCy NER) + local answering for
+summarization & code_generation behind free verifiers → only factual / math /
+logic / code_debugging escalate (9 per-task calls, batch still off).
+Hardening from a GPT-5.2 cross-model audit (see bibliography §3): SDK retries off,
+deadline-aware per-call timeouts (hard_cap_seconds=540), provisional result writes
+with task_id upsert, ALLOWED_MODELS→fallback_models failover.
+Validation (real Fireworks API, kimi-k2p7-code):
+- 19 fixtures: 19/19 x3 runs, 1,424-1,610 tokens (9 calls)
+- Gauntlet: 18/19 (only the known-ambiguous mixed-sentiment task)
+- glm-5.2 judge-sim on the 9 newly-local answers: 9/9 PASS
+Ladder decision: if v24 scores >=84.2% with time left, consider v25 (batch +
+reasoning_effort=none ≈ 650 tokens, now protected by provisional writes);
+ANY failure → restore v23 field immediately (scored twice at 94.7%).
+
+## Previous freeze: v20
 Measured on the real Fireworks API (kimi-k2p7-code):
 - 19 fixtures: 19/19 x4 runs, 639-649 tokens (4 calls: 2 solo logic + 2 batches)
 - Generalization gauntlet (19 fresh adversarial tasks): 18/19 (last miss genuinely ambiguous)

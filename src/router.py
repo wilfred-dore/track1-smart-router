@@ -54,8 +54,24 @@ class Router:
         self._cache = {}
         budget = cfg["limits"].get("total_budget_seconds")
         self.deadline = (time.monotonic() + budget) if budget else None
+        # Hard ceiling (vs the grader's 10-minute kill): past it, no Fireworks
+        # call may even START, and per-call timeouts shrink as it approaches so
+        # one stalled upstream request can never strand the whole run.
+        hard = cfg["limits"].get("hard_cap_seconds")
+        self.hard_deadline = (time.monotonic() + hard) if hard else None
         self._rushed = False
         self._defer_escalation = False
+
+    def _call_timeout(self, wanted):
+        """Deadline-aware timeout for one Fireworks call: never more than the
+        time actually left before the hard cap (minus a flush margin). Returns
+        None for 'no limit configured'; raises if too little time remains."""
+        if self.hard_deadline is None:
+            return wanted
+        remaining = self.hard_deadline - time.monotonic() - 10  # flush margin
+        if remaining < 8:
+            raise TimeoutError("hard time cap: skipping escalation")
+        return min(wanted, remaining) if wanted else remaining
 
     def solve(self, task):
         t0 = time.time()
@@ -99,6 +115,12 @@ class Router:
             results.append(rec)
             if rec["route"] == "pending_escalation":
                 pending.append(rec)
+                # Write the provisional local answer IMMEDIATELY: if the
+                # batched calls stall and the container is killed, the output
+                # file still holds a best-effort answer for every task instead
+                # of only the solver prefix (the 21% collapse signature).
+                if on_result:
+                    on_result(rec)
             elif on_result:
                 on_result(rec)
         # Group reasoning-type tasks separately: mixing heterogeneous reasoning
@@ -208,9 +230,11 @@ class Router:
                 max_tokens=min(budget, 4000),
                 stop=ecfg.get("stop") or None,
                 extra_params=extra,
-                # A grouped call legitimately takes longer than a single one;
-                # the 25 s default was killing every batch on slow upstreams.
-                timeout=(ecfg.get("batch") or {}).get("timeout_seconds") or 90)
+                # A grouped call legitimately takes longer than a single one
+                # (the 25 s default was killing every batch on slow upstreams),
+                # but never longer than the time left before the hard cap.
+                timeout=self._call_timeout(
+                    (ecfg.get("batch") or {}).get("timeout_seconds") or 90))
             if usage.get("finish_reason") == "length":
                 # Truncated batch: every parsed segment is suspect (a cut-off
                 # markdown list still yields plausible-looking fragments).
@@ -303,7 +327,8 @@ class Router:
                       {"role": "user", "content": prompt[:ecfg["max_prompt_chars"]]}],
             max_tokens=by_category(ecfg["max_tokens"], category),
             stop=ecfg.get("stop") or None,
-            extra_params=ecfg.get("extra_params") or None)
+            extra_params=ecfg.get("extra_params") or None,
+            timeout=self._call_timeout(self.cfg["limits"].get("per_task_seconds")))
         rec.update(route="fireworks", model=model,
                    tokens=usage["prompt_tokens"] + usage["completion_tokens"])
         return text or "Unable to answer."

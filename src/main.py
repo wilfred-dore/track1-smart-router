@@ -46,7 +46,16 @@ def main():
     results = []
 
     def on_result(rec):
-        results.append({"task_id": rec["task_id"], "answer": rec["answer"]})
+        # Upsert by task_id: the batched path emits a provisional local answer
+        # first, then the improved escalated answer for the same task, so the
+        # output file is complete (not just solver tasks) at any kill point.
+        entry = {"task_id": rec["task_id"], "answer": rec["answer"]}
+        for i, existing in enumerate(results):
+            if existing["task_id"] == rec["task_id"]:
+                results[i] = entry
+                break
+        else:
+            results.append(entry)
         write_results(results)
         print(f"[main] {rec['task_id']}: route={rec.get('route')} "
               f"tokens={rec.get('tokens', 0)}", file=sys.stderr)

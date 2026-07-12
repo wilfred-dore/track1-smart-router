@@ -73,6 +73,17 @@ against those three facts, not against generic LLM-cost folklore.
 | Policy sweep instead of hyperparameter search (3 qualitative configs × full eval) | ✅ chose the routing policy |
 | Escalation batching (one structured call, per-task fallback on parse failure) | ✅ implemented & validated: 19/19 @ 684 tokens in 1 call via Mammouth/kimi (-36% vs per-task); flag off until a passing score is posted |
 
+### Cross-model audit (GPT-5.2 via OpenAI API, July 12)
+A fresh-eyes fragility audit by a different model family over `src/` produced four
+adopted fixes (all re-verified by us before shipping in v24):
+
+| Finding | Fix |
+|---|---|
+| OpenAI SDK default `max_retries=2` silently triples the wall-clock cost of every slow/failed call on a flaky upstream | `max_retries=0` (the cascade already has per-task fallbacks) |
+| Batched path defers ALL escalated tasks with no provisional write → a mid-run kill leaves only the solver prefix in `results.json` (the most plausible mechanical explanation of the 21.1% collapse) | provisional local answers written immediately, upsert by `task_id` on improvement |
+| Fixed 25 s per-call timeout ignores the 10-minute hard cap: one stalled upstream request near the end strands the run | deadline-aware per-call timeouts (`hard_cap_seconds`), escalation refused when < 8 s remain |
+| Empty/unparseable `ALLOWED_MODELS` in live mode sends the literal string `mock-model` to the real proxy → every escalation 404s | failover to the competition's published allowed list (config-driven `fallback_models`) |
+
 ## 4. Libraries & curated lists (researched July 10)
 
 **Category verdict up front: the entire prompt-compression ecosystem targets

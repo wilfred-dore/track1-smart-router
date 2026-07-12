@@ -7,8 +7,10 @@ solvers:
   enabled: true
   use:
   - math
+  - sentiment
+  - ner
   min_confidence: 0.75
-  ner_backend: rules
+  ner_backend: spacy
 local:
   model_path: models/model.gguf
   n_ctx: 2048
@@ -60,15 +62,17 @@ gate:
 escalation:
   enabled: true
   never: []
+  # v24: categories whose answers cannot be VERIFIED for free escalate;
+  # summarization / code_generation / sentiment / ner are answered locally
+  # behind their free verifiers (sentence counts, ast.parse, solver confidence).
   always:
   - factual
   - math
-  - sentiment
-  - summarization
-  - ner
-  - code_debugging
   - logic
-  - code_generation
+  - code_debugging
+  fallback_models:
+  - kimi-k2p7-code
+  - minimax-m3
   system_prompt: Answer concisely in English.
   category_instructions:
     code_debugging: Bug in one line, then corrected code only.
@@ -114,3 +118,4 @@ mock:
 limits:
   per_task_seconds: 25
   total_budget_seconds: 480
+  hard_cap_seconds: 540

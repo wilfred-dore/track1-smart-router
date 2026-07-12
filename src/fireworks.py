@@ -79,9 +79,13 @@ class FireworksClient(_UsageTracker):
     def __init__(self):
         super().__init__()
         from openai import OpenAI  # lazy import: not needed in mock mode
+        # max_retries=0: the SDK default (2) silently turns one slow call into
+        # three, eating minutes of the 10-minute cap on a flaky upstream. Our
+        # cascade already has a local fallback per task — fail fast instead.
         self._client = OpenAI(base_url=os.environ["FIREWORKS_BASE_URL"],
                               api_key=os.environ.get("FIREWORKS_API_KEY") or "not-provided",
-                              timeout=25.0)  # per-request rule is 30 s
+                              timeout=25.0,  # per-request rule is 30 s
+                              max_retries=0)
 
     def chat(self, model, messages, max_tokens, stop=None, extra_params=None,
              timeout=None):
@@ -131,6 +135,11 @@ def resolve_model(category, cfg):
     per-category preferences from config.yaml (substring matching)."""
     allowed = parse_allowed_models(os.environ.get("ALLOWED_MODELS", ""))
     prefs = by_category(cfg["escalation"]["model_preference"], category) or []
+    if not allowed:
+        # ALLOWED_MODELS absent or unparseable in the grading env: sending
+        # "mock-model" to a live proxy would 404 every escalation. Fall back to
+        # the competition's published allowed list (config, never hardcoded).
+        allowed = list(cfg["escalation"].get("fallback_models") or [])
     for pref in prefs:
         for model in allowed:
             if pref.lower() in model.lower():
