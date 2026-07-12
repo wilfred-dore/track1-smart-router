@@ -7,13 +7,11 @@ solvers:
   enabled: true
   use:
   - math
-  - sentiment
-  - ner
   min_confidence: 0.75
-  ner_backend: spacy
+  ner_backend: rules
 local:
   model_path: models/model.gguf
-  n_ctx: 4096
+  n_ctx: 2048
   n_threads: 0
   temperature: 0.1
   system_prompt: You are a precise assistant. Answer in English, directly and concisely.
@@ -63,10 +61,14 @@ escalation:
   enabled: true
   never: []
   always:
-  - math
-  - logic
   - factual
+  - math
+  - sentiment
+  - summarization
+  - ner
   - code_debugging
+  - logic
+  - code_generation
   system_prompt: Answer concisely in English.
   category_instructions:
     code_debugging: Bug in one line, then corrected code only.
@@ -88,17 +90,15 @@ escalation:
     code_debugging: 800
     code_generation: 800
   batch:
-    enabled: true
+    enabled: false
     max_tasks: 10
     timeout_seconds: 90
     solo_categories:
     - logic
   max_prompt_chars: 6000
   stop: []
-  extra_params:
-    reasoning_effort: none
-  extra_params_reasoning:
-    reasoning_effort: none
+  extra_params: {}
+  extra_params_reasoning: {}
   model_preference:
     default:
     - kimi
