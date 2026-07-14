@@ -1,4 +1,16 @@
-# STATUS — July 12, 2026 (deadline: today, 3pm PT / ~00:03 CEST Jul 13)
+# STATUS — FINAL (event closed July 13, 2026)
+
+## FINAL RESULT: 94.7% accuracy @ 6,283 tokens — rank 32 of 152 qualified
+The frozen v23 image was re-scored by the organizers on REFRESHED prompts and
+held 94.7% (fourth consecutive qualifying eval of the same binary: 94.7 / 94.7 /
+89.5 / 94.7). The final board ranks by highest accuracy with tokens as
+tie-break — a post-close rule change from the announced fewest-tokens-above-gate.
+As measured here beforehand, most 0-token leaders collapsed on the fresh set
+(84.2% → rank 73 for the long-time leader; others to 140+), validating the
+robustness-first endgame: ship the profile that survives THEIR environment, not
+the one that wins ours.
+
+# Log below — July 12, 2026 (deadline: 3pm PT / ~00:03 CEST Jul 13)
 
 ## POST-MORTEM v24: their eval scored it 36.8% (checked 12:37) — v23 restored (12:58)
 Triple-validated profile (19/19 x3 real API, gauntlet 18/19, judge-sim 9/9) still
